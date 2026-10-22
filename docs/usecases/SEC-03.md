@@ -1,6 +1,6 @@
-# SEC\-02
+# SEC\-03
 
-## SEC-02: Cross-Organisation Threat Intel Sharing
+## SEC-03: Cross-Organisation Threat Intel Sharing
 
 ## Domain
 
