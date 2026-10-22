@@ -33,8 +33,12 @@ about timing, this wins.
 5. **The run ends when any of these is true**, whichever comes first:
    - the scenario reaches its natural end node (agreement recorded, findings
      recorded, discharge recorded, determination issued);
-   - `day >= deadline` for a scenario that has one (SEC-01: `disclosure_deadline_days`;
-     HEALTH-01: `turnaround_days`; HEALTH-02: a `max_days` bound, default 5);
+   - the clock reaches `max_days` for a scenario that has one (SEC-01:
+     `disclosure_deadline_days`; HEALTH-01: `turnaround_days`; HEALTH-02: default 5).
+     **The deadline round finishes first:** when `day >= max_days` the run is marked
+     ending, but the current round completes, so an agent whose action is "on
+     deadline" (e.g. the SEC-01 researcher's publish-on-deadline) still gets its
+     turn. End *after* that round, not the instant the day is reached;
    - the LangGraph recursion limit is hit (the hard backstop, ~25–30 per the spec).
 
 ## Config keys this introduces
