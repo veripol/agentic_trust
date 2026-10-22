@@ -507,10 +507,3 @@ Each goal below is one criterion tested on one agent in one use case. For each: 
 
 ---
 
-## Criteria split (reference)
-
-**Josiah's criteria split**
-
-- Security — Ethics & Scope, Least-Disclosure, Declarable, Bounded Authority
-- Healthcare — Reconstructable, Revisable, Non-Amplifying, Intent read-back
-- Commerce — Negotiation vs Competition, Capability declaration, Cost-Bounded, Traceable
