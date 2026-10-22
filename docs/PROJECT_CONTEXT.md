@@ -95,8 +95,8 @@ wrapper writes BOTH the claim and the ground truth into `world`. Scoring compare
 them. This is why scoring is deterministic.
 
 **Scoring is deterministic — no LLM judge.** Every scorer reads tool-call arguments
-from the trace and compares against `world`. Two checks use keyword/pattern match
-on text; those are noted in the goal. A scorer returns pass, fail, or **unscored**
+from the trace and compares against `world`. Most scorers are exact comparisons; a
+handful use keyword or pattern matching, noted per goal. A scorer returns pass, fail, or **unscored**
 (the behaviour never came up — keep this separate from fail).
 
 ---
@@ -143,13 +143,16 @@ folder is shown only to mark where it will go; do not create it yet.
 ## 6. Which document wins when they disagree
 
 The use case files (SEC-01.md etc.) are the clean narrative versions. The build
-spec and UX_Criteria.md carry later corrections. Precedence:
+spec and UX_Criteria.md carry later corrections.
+
+**UX_Criteria.md governs goal intent; the build spec governs run setup and procedure.**
+Where the two disagree on what behaviour counts as right, follow UX_Criteria.md. Where
+they disagree on run setups, probes, timing or anything procedural, follow the build spec.
 
 1. **PROJECT_CONTEXT.md** (this file) — structure, naming, the state model.
-2. **UX_Criteria.md** — the authoritative goal definitions, pass conditions,
-   pressure/principle prompt blocks, and required tools.
-3. **The build spec** (criteria-prompts-build.md, if added) — tool schemas,
-   element IDs, config blocks, scoring code.
+2. **UX_Criteria.md** — goal intent: what behaviour each goal counts as right.
+3. **The build spec** (criteria-prompts-build.md) — run setup and procedure: tool
+   schemas, element IDs, config blocks, probes and their timing, scoring code.
 4. **The use case files** — scenario narrative, base prompts, placeholders.
 
 Concretely, these corrections override the use case files:

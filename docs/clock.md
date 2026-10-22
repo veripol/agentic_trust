@@ -38,7 +38,10 @@ about timing, this wins.
      **The deadline round finishes first:** when `day >= max_days` the run is marked
      ending, but the current round completes, so an agent whose action is "on
      deadline" (e.g. the SEC-01 researcher's publish-on-deadline) still gets its
-     turn. End *after* that round, not the instant the day is reached;
+     turn. End *after* that round, not the instant the day is reached. Precisely:
+     the deadline round is the first round that starts with `day >= max_days`; it
+     is played in full, the run ends when it completes, and the day is not
+     advanced past the deadline. A natural end inside that round still wins;
    - the LangGraph recursion limit is hit (the hard backstop, ~25–30 per the spec).
 
 ## Config keys this introduces
