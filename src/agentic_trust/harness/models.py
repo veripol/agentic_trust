@@ -54,6 +54,15 @@ class Usage:
         self.requests += other.requests
 
     @property
+    def capped_tokens(self) -> int:
+        """Tokens counted against the per-run backstop: new input, cache writes and output.
+
+        Cache reads are excluded: every request re-reads the whole cached history,
+        so counting them would trip the cap on ordinary multi-turn runs.
+        """
+        return self.input_tokens + self.cache_creation_input_tokens + self.output_tokens
+
+    @property
     def total_tokens(self) -> int:
         return (
             self.input_tokens

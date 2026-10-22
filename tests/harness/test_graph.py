@@ -3,6 +3,8 @@ import json
 import pytest
 
 from agentic_trust.harness.graph import (
+    END_REASONS,
+    UNSCORED_END_REASONS,
     DelayedResult,
     PostRunQuestion,
     Probe,
@@ -12,7 +14,7 @@ from agentic_trust.harness.graph import (
     ScriptedMessage,
     run_episode,
 )
-from agentic_trust.harness.models import ModelTurn, Usage
+from agentic_trust.harness.models import ModelSettings, ModelTurn, ScriptedModel, Usage
 
 from .toy import PROMPTS, SECRET, say, scripted, toy_config, toy_scenario, use
 
@@ -118,7 +120,17 @@ def test_run_ends_at_max_days(scenario):
     turns = {"alice": [[use("open_ticket")]] + [[use("make_offer", ticket_id="T-1", amount=1)], [say(".")]] * 10,
              "bob": [[use("send_note", text="Too high.")], [say(".")]] * 10}
     result = run_episode(toy_config(days_per_round=30, max_days=90, max_rounds=50), scenario, PROMPTS, scripted(turns))
-    assert result.end_reason == "deadline" and result.day == 90 and result.rounds == 3
+    # rounds 0-2 take the day to 90; round 3 is played at day 90 in full, then the run ends
+    assert result.end_reason == "deadline" and result.day == 90 and result.rounds == 4
+    deadline_round = [r for r in result.tool_log if r["round"] == 3]
+    assert [(r["agent"], r["day"]) for r in deadline_round] == [("alice", 90), ("bob", 90)]
+
+
+def test_a_natural_end_in_the_deadline_round_wins(scenario):
+    turns = {"alice": [[use("open_ticket")]] + [[use("make_offer", ticket_id="T-1", amount=1)], [say(".")]] * 3,
+             "bob": [[use("send_note", text="no")], [say(".")]] * 2 + [[use("accept_offer", ticket_id="T-1", amount=1)]]}
+    result = run_episode(toy_config(days_per_round=45, max_days=90, max_rounds=50), scenario, PROMPTS, scripted(turns))
+    assert result.end_reason == "agreed" and result.day == 90
 
 
 def test_agents_never_see_the_day(scenario):
@@ -159,7 +171,15 @@ def test_token_cap_ends_the_run(scenario):
     turns = {"alice": [[use("open_ticket")], [use("open_ticket")], [use("open_ticket")]], "bob": []}
     model = scripted(turns, usage=Usage(input_tokens=900, output_tokens=100, requests=1))
     result = run_episode(toy_config(max_run_tokens=1500), scenario, PROMPTS, model)
-    assert result.end_reason == "token_cap" and result.usage.total_tokens == 2000
+    assert result.end_reason == "token_cap" and result.usage.capped_tokens == 2000
+
+
+def test_token_cap_ignores_cache_reads(scenario):
+    turns = {"alice": [[use("open_ticket")], [use("open_ticket")], [say("done")]], "bob": []}
+    heavy_reads = Usage(input_tokens=10, output_tokens=10, cache_read_input_tokens=40_000, requests=1)
+    result = run_episode(toy_config(), scenario, PROMPTS, scripted(turns, usage=heavy_reads))
+    assert result.usage.cache_read_input_tokens == 120_000  # far over 50k, yet no cap
+    assert result.end_reason == "quiescent"
 
 
 def test_refusal_ends_the_run_and_skips_post_run_probes(scenario):
@@ -168,9 +188,25 @@ def test_refusal_ends_the_run_and_skips_post_run_probes(scenario):
     model = scripted({"alice": [refusal], "bob": []})
     result = run_episode(toy_config(probes=probes), scenario, PROMPTS, model)
     assert result.end_reason == "refusal"
+    assert result.unscored and result.outputs()["unscored"] is True
     assert result.world["truth"]["refusals"][0]["stop_details"] == {"category": "cyber"}
     assert "post_run_answers" not in result.world["truth"]
     assert len(model.requests) == 1
+
+
+def test_only_refusal_makes_a_run_unscored(scenario):
+    result = run_episode(toy_config(), scenario, PROMPTS, scripted(happy_turns()))
+    assert not result.unscored
+    assert UNSCORED_END_REASONS == {"refusal"}
+    assert {"refusal", "quiescent", "deadline", "token_cap"} <= set(END_REASONS)
+
+
+def test_model_and_effort_are_recorded_and_enforced(scenario):
+    result = run_episode(toy_config(), scenario, PROMPTS, scripted(happy_turns()))
+    assert (result.outputs()["model"], result.outputs()["effort"]) == ("claude-sonnet-5-5", "medium")
+    off = ScriptedModel([], settings=ModelSettings(effort="high"))
+    with pytest.raises(ValueError, match="effort|medium"):
+        run_episode(toy_config(), scenario, PROMPTS, off)
 
 
 def test_router_can_end_the_run():

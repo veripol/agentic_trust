@@ -233,11 +233,14 @@ class RunConfig:
     knobs: Mapping[str, Any] = field(default_factory=dict)  # scenario config keys
     probes: tuple[Any, ...] = ()  # harness.graph.Probe objects
     initial_messages: Mapping[str, str] = field(default_factory=dict)  # agent -> kickoff text
+    # Fixed for the whole study; the harness refuses a model whose settings differ.
+    model: str = "claude-sonnet-5-5"
+    effort: str = "medium"
     days_per_round: int = 7  # docs/clock.md
-    max_days: int | None = None  # the run ends once day >= max_days (docs/clock.md)
-    max_rounds: int = 12
-    max_steps_per_turn: int = 8
-    max_run_tokens: int | None = None  # input+output tokens across the run; None = no cap
+    max_days: int | None = None  # the run ends after the round played at day >= max_days
+    max_rounds: int = 12  # negotiation round cap
+    max_steps_per_turn: int = 8  # model calls per agent turn
+    max_run_tokens: int | None = 50_000  # runaway backstop only; see Usage.capped_tokens
     recursion_limit: int = 25  # LangGraph supersteps = agent turns
     tags: tuple[str, ...] = ()
 

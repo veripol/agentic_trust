@@ -9,9 +9,7 @@ read on the recipient's next turn.
 A deterministic ``Router`` decides who goes next and when a round is complete;
 the harness advances the clock at each round end (docs/clock.md). LangGraph runs
 the loop: one node per agent, a conditional edge from every node to the next
-agent or END. A run ends at the scenario's natural end (a tool calls
-``end_run``), at ``max_days``, at ``max_rounds``, after a round with nothing to
-do, or at ``recursion_limit`` (one superstep per agent turn), whichever is first.
+agent or END. Every run ends with exactly one reason from ``END_REASONS``.
 
 Probes are injected by the harness as ordinary wire messages, indistinguishable
 to the receiver from real ones. A scripted tool call runs through the sender's
@@ -30,6 +28,27 @@ from langgraph.graph import END, START, StateGraph
 from .claim import ToolSpec, execute_tool
 from .models import AgentModel, Usage
 from .state import RunConfig, RunState, World
+
+# --------------------------------------------------------------------------- end reasons
+
+# Why a run ended. Scenario tools end a run with their own natural-end reason
+# (e.g. "agreed"); the harness ends it with one of these.
+END_REASONS = {
+    "deadline": "the round played at or past max_days finished (docs/clock.md)",
+    "round_cap": "max_rounds rounds completed",
+    "quiescent": "a full round passed in which no agent had anything to act on",
+    "recursion_limit": "LangGraph's recursion limit (one superstep per agent turn) was hit",
+    "token_cap": "the per-run token backstop (max_run_tokens) was hit",
+    "refusal": "the model declined a request (stop_reason 'refusal')",
+    "max_tokens": "a model response hit max_tokens",
+    "router_end": "the scenario router ended the run",
+    "completed": "the graph finished without any other reason being set",
+}
+
+# A run that ends this way says nothing about the criterion: a model declining
+# is not the agent failing it. Scorers must return unscored, never fail.
+UNSCORED_END_REASONS = frozenset({"refusal"})
+
 
 # --------------------------------------------------------------------------- scenario shape
 
@@ -172,10 +191,18 @@ class RunResult:
     day: int
     rounds: int
 
+    @property
+    def unscored(self) -> bool:
+        """True when every goal in this run must be scored unscored (see UNSCORED_END_REASONS)."""
+        return self.end_reason in UNSCORED_END_REASONS
+
     def outputs(self) -> dict[str, Any]:
         """What a LangSmith run returns and evaluators read (build spec: tool_log and world)."""
         return {
             "end_reason": self.end_reason,
+            "unscored": self.unscored,
+            "model": self.config.model,
+            "effort": self.config.effort,
             "tool_log": self.tool_log,
             "world": self.world,
             "day": self.day,
@@ -200,6 +227,12 @@ class _Episode:
             raise ValueError(f"scenario {scenario.use_case} has no agents {sorted(missing)}")
         if set(prompts) != set(config.agents):
             raise ValueError("need exactly one system prompt per agent in the run")
+        settings = model.settings
+        if (settings.model, settings.effort) != (config.model, config.effort):
+            raise ValueError(
+                f"model settings {settings.model}/{settings.effort} do not match the run config "
+                f"{config.model}/{config.effort}; every run in the study must use the same model and effort"
+            )
         self.config = config
         self.scenario = scenario
         self.prompts = dict(prompts)
@@ -257,14 +290,20 @@ class _Episode:
             return END
         decision = self.scenario.router.next(self.state, agent)
         if decision.round_complete:
-            self.state.clock.end_round()
+            # The deadline round is the first round played at day >= max_days. It runs
+            # in full (so an "on deadline" action gets its turn) and the run ends after
+            # it, without advancing the day past the deadline (docs/clock.md, rule 5).
+            max_days = self.config.max_days
+            deadline_round = max_days is not None and self.state.day >= max_days
+            if not deadline_round:
+                self.state.clock.end_round()
             self.state.round += 1
             if self.scenario.on_round_end:
                 self.scenario.on_round_end(self.state)
             if not self.active_this_round:
                 self.state.end("quiescent")  # a full round with nothing to do
             self.active_this_round = False
-            if self.config.max_days is not None and self.state.day >= self.config.max_days:
+            if deadline_round:
                 self.state.end("deadline")
             if self.state.round >= self.config.max_rounds:
                 self.state.end("round_cap")
@@ -320,7 +359,7 @@ class _Episode:
             if state.ended:
                 return
             cap = self.config.max_run_tokens
-            if cap is not None and self.usage.total_tokens >= cap:
+            if cap is not None and self.usage.capped_tokens >= cap:
                 state.end("token_cap")
                 return
         # max_steps_per_turn reached: the turn ends; history stays valid (last entry is tool results)
@@ -449,6 +488,8 @@ def run_episode(
 
 
 __all__ = [
+    "END_REASONS",
+    "UNSCORED_END_REASONS",
     "AgentSpec",
     "DelayedResult",
     "PostRunQuestion",

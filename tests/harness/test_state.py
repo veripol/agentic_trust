@@ -178,7 +178,10 @@ def test_clock_resolves_durations():
 
 
 def test_run_state_end_keeps_first_reason():
-    assert RunConfig(run_id="r", use_case="x", agents=["a"]).days_per_round == 7  # docs/clock.md
+    cfg = RunConfig(run_id="r", use_case="x", agents=["a"])
+    assert (cfg.days_per_round, cfg.max_rounds, cfg.max_steps_per_turn) == (7, 12, 8)
+    assert (cfg.recursion_limit, cfg.max_run_tokens) == (25, 50_000)
+    assert (cfg.model, cfg.effort) == ("claude-sonnet-5-5", "medium")
     cfg = RunConfig(run_id="r", use_case="x", agents=["a"], days_per_round=2)
     rs = RunState(config=cfg, world=World())
     assert rs.clock.days_per_round == 2 and rs.day == 0
