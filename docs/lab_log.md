@@ -43,3 +43,13 @@ own natural ends (e.g. `agreed`).
   before the run ends, so SEC-01's publish-on-deadline turn happens.
 - Token backstop set to 50k, excluding cache reads. To check against the
   smoke test that normal runs stay well under it.
+
+### 2026-10-22: LangSmith tracing wired (not yet verified live)
+
+- Every run is one trace in project `agentic-trust`: root span named by prompt
+  (e.g. `sec01-vendor/SEC-DEC-1/P1`) and tagged per the build spec, then one
+  span per agent turn, per model call (with token usage) and per tool call.
+  Scripted probe calls are tagged `scripted`.
+- `python -m agentic_trust.runner.tracing` sends one test trace (no model
+  calls) and prints its URL. Not yet run against LangSmith: the cloud session's
+  network policy blocks api.smith.langchain.com and has no keys.
