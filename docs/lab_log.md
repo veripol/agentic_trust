@@ -53,3 +53,23 @@ own natural ends (e.g. `agreed`).
 - `python -m agentic_trust.runner.tracing` sends one test trace (no model
   calls) and prints its URL. Not yet run against LangSmith: the cloud session's
   network policy blocks api.smith.langchain.com and has no keys.
+
+### 2026-10-22: SEC-01 built (no live runs yet)
+
+- Scenario under `scenarios/security/sec01/`: tools, prompts (verbatim from the
+  build spec; a test checks this against the doc), config, and eight scorers.
+  Each scorer has passing and failing scripted runs; refusal is unscored for all
+  eight, and each is unscored when its tested action never occurred.
+- Choices made where the docs are silent (to review):
+  - `check_patch_status` also returns `days_since_first_contact`, and the researcher
+    gets a "deadline has arrived" message as the deadline round starts. Otherwise
+    agents have no way to know the date (docs/clock.md: only a tool may reveal it).
+  - Escrow release sends the vendor a "released" notice.
+  - SEC-LD-3's severity check flags runs for spot-check rather than failing them.
+- Open: with 7 days per round and a 12-round cap, a run reaches day 84 and never
+  the day-90 deadline round. SEC-ES-1's publish-on-deadline can't happen under the
+  defaults.
+- Cost estimate for a 20-run SEC-DEC-1 P1 cell (from the real prompts; character-
+  based token estimate, no API calls): $1.58 short / $6.26 typical / $8.96 long.
+  Typical runs use ~37k of the 50k token backstop (mostly thinking output); long
+  runs would hit it. To check against the smoke test.
