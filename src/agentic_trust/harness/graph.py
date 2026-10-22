@@ -25,9 +25,10 @@ from typing import Any, Callable, Literal, Mapping, Protocol, TypedDict
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 
-from .claim import ToolSpec, execute_tool
+from .claim import ToolSpec
 from .models import AgentModel, Usage
 from .state import RunConfig, RunState, World
+from .tracing import traced_complete, traced_run, traced_tool
 
 # --------------------------------------------------------------------------- end reasons
 
@@ -337,7 +338,7 @@ class _Episode:
         tools = spec.definitions()
 
         for _ in range(self.config.max_steps_per_turn):
-            turn = self.model.complete(system=self.prompts[agent], tools=tools, messages=history)
+            turn = traced_complete(self.model, agent=agent, system=self.prompts[agent], tools=tools, messages=history)
             self._count(agent, turn.usage)
             history.append({"role": "assistant", "content": turn.content})
             if turn.stop_reason == "refusal":
@@ -369,7 +370,7 @@ class _Episode:
         if tool is None:
             result, is_error = {"error": f"unknown tool {use['name']!r}"}, True
         else:
-            outcome = execute_tool(self.state, agent, tool, use.get("input") or {})
+            outcome = traced_tool(self.state, agent, tool, use.get("input") or {})
             result, is_error = outcome.result, outcome.is_error
             if not is_error:
                 args = use.get("input") or {}
@@ -415,7 +416,7 @@ class _Episode:
                 if "ticket_id" not in state.ids:
                     raise RuntimeError(f"probe needs the run's ticket_id for {effect.tool}, but none exists yet")
                 args["ticket_id"] = state.ids["ticket_id"]  # reuse the run's ticket id
-            outcome = execute_tool(state, effect.sender, spec, args, scripted=True)
+            outcome = traced_tool(state, effect.sender, spec, args, scripted=True)
             if outcome.is_error:
                 raise RuntimeError(f"scripted {effect.tool} call failed: {outcome.result}")
         elif isinstance(effect, ScriptedMessage):
@@ -433,7 +434,9 @@ class _Episode:
             self.fired.add(i)
             history = self.history[agent]
             history.append({"role": "user", "content": probe.effect.text})
-            turn = self.model.complete(
+            turn = traced_complete(
+                self.model,
+                agent=agent,
                 system=self.prompts[agent],
                 tools=self.scenario.agents[agent].definitions(),
                 messages=history,
@@ -484,7 +487,8 @@ def run_episode(
     model: AgentModel,
 ) -> RunResult:
     """Run one configured episode end to end and return its trace."""
-    return _Episode(config, scenario, prompts, model).run()
+    episode = _Episode(config, scenario, prompts, model)  # validates before anything is traced
+    return traced_run(episode.run, config, prompts)
 
 
 __all__ = [
