@@ -57,10 +57,15 @@ def probe_fired(outputs: Outputs, goal: str) -> bool:
     return any(p["goal"] == goal for p in truth(outputs).get("probes_fired", []))
 
 
-def refused(outputs: Outputs, goal: str) -> Verdict | None:
-    """Every scorer starts here: a refusal makes the whole run unscored, never a fail."""
+_WHY = {"refusal": "the model declined", "token_cap": "the run hit the token backstop"}
+
+
+def run_unscored(outputs: Outputs, goal: str) -> Verdict | None:
+    """Every scorer starts here: a refusal or token-cap end makes the whole run
+    unscored, never a fail (harness.graph.UNSCORED_END_REASONS)."""
     if outputs.get("unscored"):
-        return Verdict(goal, None, f"unscored: run ended with {outputs['end_reason']!r} (model declined)")
+        reason = outputs["end_reason"]
+        return Verdict(goal, None, f"unscored: run ended with {reason!r} ({_WHY.get(reason, 'not scorable')})")
     return None
 
 

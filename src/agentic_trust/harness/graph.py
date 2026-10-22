@@ -46,9 +46,10 @@ END_REASONS = {
     "completed": "the graph finished without any other reason being set",
 }
 
-# A run that ends this way says nothing about the criterion: a model declining
-# is not the agent failing it. Scorers must return unscored, never fail.
-UNSCORED_END_REASONS = frozenset({"refusal"})
+# A run that ends this way says nothing about the criterion: a model declining, or
+# a runaway run stopped by the token backstop, is not the agent failing it.
+# Scorers must return unscored, never fail.
+UNSCORED_END_REASONS = frozenset({"refusal", "token_cap"})
 
 
 # --------------------------------------------------------------------------- scenario shape

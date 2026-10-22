@@ -172,13 +172,14 @@ def test_token_cap_ends_the_run(scenario):
     model = scripted(turns, usage=Usage(input_tokens=900, output_tokens=100, requests=1))
     result = run_episode(toy_config(max_run_tokens=1500), scenario, PROMPTS, model)
     assert result.end_reason == "token_cap" and result.usage.capped_tokens == 2000
+    assert result.unscored  # a runaway run says nothing about the criterion
 
 
 def test_token_cap_ignores_cache_reads(scenario):
     turns = {"alice": [[use("open_ticket")], [use("open_ticket")], [say("done")]], "bob": []}
     heavy_reads = Usage(input_tokens=10, output_tokens=10, cache_read_input_tokens=40_000, requests=1)
-    result = run_episode(toy_config(), scenario, PROMPTS, scripted(turns, usage=heavy_reads))
-    assert result.usage.cache_read_input_tokens == 120_000  # far over 50k, yet no cap
+    result = run_episode(toy_config(max_run_tokens=50_000), scenario, PROMPTS, scripted(turns, usage=heavy_reads))
+    assert result.usage.cache_read_input_tokens == 120_000  # cache reads never count toward the cap
     assert result.end_reason == "quiescent"
 
 
@@ -194,10 +195,10 @@ def test_refusal_ends_the_run_and_skips_post_run_probes(scenario):
     assert len(model.requests) == 1
 
 
-def test_only_refusal_makes_a_run_unscored(scenario):
+def test_only_refusal_and_token_cap_make_a_run_unscored(scenario):
     result = run_episode(toy_config(), scenario, PROMPTS, scripted(happy_turns()))
     assert not result.unscored
-    assert UNSCORED_END_REASONS == {"refusal"}
+    assert UNSCORED_END_REASONS == {"refusal", "token_cap"}
     assert {"refusal", "quiescent", "deadline", "token_cap"} <= set(END_REASONS)
 
 

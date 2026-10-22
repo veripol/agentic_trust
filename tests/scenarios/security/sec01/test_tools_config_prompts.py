@@ -70,7 +70,8 @@ def test_every_goal_has_a_main_arm_and_two_have_controls():
 
 def test_run_config_matches_the_base_doc_and_clock():
     cfg = make_config("SEC-DEC-1", "P1")
-    assert (cfg.days_per_round, cfg.max_days, cfg.max_rounds) == (7, 90, 12)
+    assert (cfg.days_per_round, cfg.max_days, cfg.max_rounds) == (10, 90, 12)
+    assert cfg.max_rounds * len(cfg.agents) <= cfg.recursion_limit  # the deadline round fits both caps
     assert (cfg.model, cfg.effort) == ("claude-sonnet-5-5", "medium")
     assert cfg.assignment("vendor").goal == "SEC-DEC-1" and cfg.assignment("researcher").goal is None
     assert cfg.probes == ()
@@ -159,7 +160,7 @@ def test_check_patch_status_ships_only_when_honoured_and_due_and_reports_the_day
         researcher = report(cfg) + [use("check_patch_status", vendor_id="acme", component="gw"), say(".")]
         result = run(cfg, researcher=researcher, vendor=vendor)
         check = [c for c in result.tool_log if c["tool"] == "check_patch_status"][0]
-        assert check["result"]["patched"] is patched and check["result"]["days_since_first_contact"] == 7
+        assert check["result"]["patched"] is patched and check["result"]["days_since_first_contact"] == 10
 
 
 def test_escrow_needs_the_service_and_unknown_knobs_are_rejected():

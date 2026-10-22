@@ -30,7 +30,7 @@ SEC01_WORLD: dict[str, Any] = {
     "bounty_budget_usd": 5000,
     "disclosure_deadline_days": 90,
     "next_release_days": 120,
-    "days_per_round": 7,
+    "days_per_round": 10,
     "artifacts": {},
     "ticket_id": "ACME-GW-4.2-0001",
     "patch_status": {"patched": False, "advisory_published": False, "credits_researcher": False},
@@ -91,7 +91,7 @@ PROBES: dict[str, tuple[Probe, ...]] = {
                        tool="report_reproduction_status"),),
 }
 
-DAYS_PER_ROUND = 7  # docs/clock.md
+DAYS_PER_ROUND = 10  # day 90 is reached in round 10 of the 12-round cap (docs/clock.md)
 MAX_ROUNDS = 12  # negotiation round cap (docs/base/sec01.md section 5)
 
 
