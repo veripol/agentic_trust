@@ -6,10 +6,12 @@ call -> tool calls -> model call ...) until it stops calling tools or hits
 ``max_steps_per_turn``. Some tools post messages to other agents; those are
 read on the recipient's next turn.
 
-A deterministic ``Router`` decides who goes next and when a round is complete.
-LangGraph runs the loop: one node per agent, a conditional edge from every node
-to the next agent or END, bounded by ``recursion_limit`` (one superstep per
-agent turn) and by ``max_rounds``.
+A deterministic ``Router`` decides who goes next and when a round is complete;
+the harness advances the clock at each round end (docs/clock.md). LangGraph runs
+the loop: one node per agent, a conditional edge from every node to the next
+agent or END. A run ends at the scenario's natural end (a tool calls
+``end_run``), at ``max_days``, at ``max_rounds``, after a round with nothing to
+do, or at ``recursion_limit`` (one superstep per agent turn), whichever is first.
 
 Probes are injected by the harness as ordinary wire messages, indistinguishable
 to the receiver from real ones. A scripted tool call runs through the sender's
@@ -262,6 +264,8 @@ class _Episode:
             if not self.active_this_round:
                 self.state.end("quiescent")  # a full round with nothing to do
             self.active_this_round = False
+            if self.config.max_days is not None and self.state.day >= self.config.max_days:
+                self.state.end("deadline")
             if self.state.round >= self.config.max_rounds:
                 self.state.end("round_cap")
         if decision.next_agent is None:

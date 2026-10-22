@@ -84,9 +84,16 @@ def test_scripted_and_real_messages_render_identically():
                      content={"amount_usd": 4500}, round=1, day=3)
     probe = wire.post(sender="vendor", recipients="researcher", kind="offer_bounty",
                       content={"amount_usd": 4500}, round=1, day=3, scripted=True)
-    assert real.render() == probe.render()
+    assert real.render() == probe.render() == 'From vendor via offer_bounty:\n{"amount_usd": 4500}'
     assert "scripted" not in probe.render()
     assert probe.to_dict()["scripted"] is True
+
+
+def test_the_day_is_never_rendered_to_agents():
+    wire = Wire()
+    m = wire.post(sender="a", recipients="b", content="hello", round=4, day=63)
+    assert "63" not in m.render() and "Day" not in m.render()
+    assert m.to_dict()["day"] == 63  # kept for the trace
 
 
 def test_render_is_deterministic_json():
@@ -130,22 +137,39 @@ def test_run_config_validates():
         AgentAssignment("G", "P3")
     with pytest.raises(ValueError):
         RunConfig(run_id="r", use_case="x", agents=["a"], max_rounds=0)
+    with pytest.raises(ValueError):
+        RunConfig(run_id="r", use_case="x", agents=["a"], max_days=0)
 
 
 # ----------------------------------------------------------------------------- clock
 
 
-def test_clock_advances_per_round_and_pauses_for_one_round():
-    clock = Clock(days_per_round=3)
-    assert clock.day == 0
-    assert clock.end_round() == 3
-    clock.pause_this_round()
-    assert clock.end_round() == 3  # paused round does not advance
-    assert clock.end_round() == 6  # the pause lasted one round only
+def test_clock_lives_in_world_and_advances_per_round():
+    world = World()
+    clock = Clock(world, days_per_round=7)
+    assert world["day"] == 0 and world["clock_paused"] is False
+    assert clock.end_round() == 7 and world["day"] == 7
+
+
+def test_pause_holds_until_lifted_and_the_resolving_round_does_not_advance():
+    world = World()
+    clock = Clock(world, days_per_round=7)
+    clock.pause()  # RFI issued
+    assert clock.end_round() == 0
+    assert clock.end_round() == 0  # still open: no advance
+    clock.resume()  # RFI answered during this round
+    assert world["clock_paused"] is False
+    assert clock.end_round() == 0  # the round that resolves it does not advance
+    assert clock.end_round() == 7  # resumes on the next round
+
+
+def test_clock_starts_paused_if_world_says_so():
+    clock = Clock(World({"clock_paused": True}), days_per_round=7)
+    assert clock.end_round() == 0
 
 
 def test_clock_resolves_durations():
-    clock = Clock(days_per_round=30)
+    clock = Clock(World(), days_per_round=30)
     due = clock.due_day(60)
     assert due == 60 and not clock.is_due(due)
     clock.end_round()
@@ -154,9 +178,10 @@ def test_clock_resolves_durations():
 
 
 def test_run_state_end_keeps_first_reason():
+    assert RunConfig(run_id="r", use_case="x", agents=["a"]).days_per_round == 7  # docs/clock.md
     cfg = RunConfig(run_id="r", use_case="x", agents=["a"], days_per_round=2)
     rs = RunState(config=cfg, world=World())
-    assert rs.clock.days_per_round == 2
+    assert rs.clock.days_per_round == 2 and rs.day == 0
     rs.end("agreed")
     rs.end("round_cap")
     assert rs.ended and rs.end_reason == "agreed"

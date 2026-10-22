@@ -7,9 +7,9 @@
 - ``RunConfig`` holds the knobs, probes, seeds and placeholder values. It is
   frozen at run start.
 
-``Clock`` is the simulation day counter (docs/clock.md): it starts at 0, each
-completed round advances it by ``days_per_round``, and a round can be paused
-(an RFI pauses the clock for its round).
+``Clock`` is the simulation day counter (docs/clock.md). The day is kept in
+``world`` as ground truth; each completed round advances it by
+``days_per_round`` unless the clock is paused (e.g. while an RFI is open).
 """
 
 from __future__ import annotations
@@ -110,10 +110,11 @@ class WireMessage:
             body = self.content
         else:
             body = json.dumps(self.content, sort_keys=True, ensure_ascii=False)
+        # No day stamp: the day is ground truth, visible only if a tool returns it.
         if self.kind == "result":  # a tool result that arrives later (e.g. a delayed assessment)
-            return f"[Day {self.day}] Result from {self.sender}:\n{body}"
+            return f"Result from {self.sender}:\n{body}"
         via = "" if self.kind == "message" else f" via {self.kind}"
-        return f"[Day {self.day}] From {self.sender}{via}:\n{body}"
+        return f"From {self.sender}{via}:\n{body}"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -232,7 +233,8 @@ class RunConfig:
     knobs: Mapping[str, Any] = field(default_factory=dict)  # scenario config keys
     probes: tuple[Any, ...] = ()  # harness.graph.Probe objects
     initial_messages: Mapping[str, str] = field(default_factory=dict)  # agent -> kickoff text
-    days_per_round: int = 1
+    days_per_round: int = 7  # docs/clock.md
+    max_days: int | None = None  # the run ends once day >= max_days (docs/clock.md)
     max_rounds: int = 12
     max_steps_per_turn: int = 8
     max_run_tokens: int | None = None  # input+output tokens across the run; None = no cap
@@ -252,6 +254,8 @@ class RunConfig:
             raise ValueError(f"assignments name agents not in this run: {sorted(unknown)}")
         if self.days_per_round < 0 or self.max_rounds < 1 or self.max_steps_per_turn < 1:
             raise ValueError("days_per_round >= 0, max_rounds >= 1 and max_steps_per_turn >= 1")
+        if self.max_days is not None and self.max_days < 1:
+            raise ValueError("max_days must be at least 1")
 
     def assignment(self, agent: str) -> AgentAssignment:
         return self.assignments.get(agent, AgentAssignment())
@@ -263,28 +267,43 @@ class RunConfig:
 class Clock:
     """Simulation day counter (docs/clock.md).
 
-    The day starts at 0. Each completed round advances it by ``days_per_round``,
-    unless that round was paused. Duration-based tool calls resolve against it:
-    ``due_day(n)`` is n days from now and ``is_due(d)`` says whether day d has come.
+    The day lives in ``world["day"]``: it is ground truth, starts at 0, and agents
+    never see it unless a tool returns it. Each completed round advances it by
+    ``days_per_round``. While the clock is paused (``world["clock_paused"]``, set
+    by e.g. an open RFI) rounds do not advance it, and neither does the round in
+    which the pause is lifted; it resumes on the round after. Duration-based tool
+    calls resolve against the counter: ``due_day(n)`` is n days from now and
+    ``is_due(d)`` says whether day d has come.
     """
 
-    def __init__(self, days_per_round: int) -> None:
+    def __init__(self, world: World, days_per_round: int) -> None:
+        self.world = world
         self.days_per_round = days_per_round
-        self.day = 0
-        self._paused_this_round = False
+        world.setdefault("day", 0)
+        world.setdefault("clock_paused", False)
+        self._held = bool(world["clock_paused"])  # paused at any point this round
 
-    def pause_this_round(self) -> None:
-        self._paused_this_round = True
+    @property
+    def day(self) -> int:
+        return self.world["day"]
 
     @property
     def paused(self) -> bool:
-        return self._paused_this_round
+        return bool(self.world["clock_paused"])
+
+    def pause(self) -> None:
+        self.world["clock_paused"] = True
+        self._held = True
+
+    def resume(self) -> None:
+        """Lift the pause. The current round still does not advance the clock."""
+        self.world["clock_paused"] = False
 
     def end_round(self) -> int:
         """Called by the harness when a round completes. Returns the new day."""
-        if not self._paused_this_round:
-            self.day += self.days_per_round
-        self._paused_this_round = False
+        if not self._held:
+            self.world["day"] = self.day + self.days_per_round
+        self._held = self.paused
         return self.day
 
     def due_day(self, after_days: int) -> int:
@@ -342,7 +361,7 @@ class RunState:
 
     def __post_init__(self) -> None:
         if self.clock is None:
-            self.clock = Clock(self.config.days_per_round)
+            self.clock = Clock(self.world, self.config.days_per_round)
 
     @property
     def day(self) -> int:

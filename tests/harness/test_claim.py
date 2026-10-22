@@ -61,7 +61,7 @@ def test_scripted_calls_are_flagged_in_the_log_and_claims(state):
 
 
 def test_tool_log_has_round_day_and_sequence(state):
-    state.round, state.clock.day = 2, 4
+    state.round, state.world["day"] = 2, 4
     execute_tool(state, "alice", OFFER, {"ticket_id": "T-1", "amount": 1})
     rec = state.tool_log[-1]
     assert (rec.seq, rec.round, rec.day, rec.agent, rec.tool) == (2, 2, 4, "alice", "make_offer")

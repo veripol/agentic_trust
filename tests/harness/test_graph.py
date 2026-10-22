@@ -55,7 +55,7 @@ def test_a_run_goes_end_to_end(scenario):
 def test_receiver_sees_the_public_call_only(scenario):
     result = run_episode(toy_config(), scenario, PROMPTS, scripted(happy_turns()))
     bob_sees = first_user_text(result, "bob")
-    assert bob_sees.startswith("[Day 0] From alice via make_offer:")
+    assert bob_sees.startswith("From alice via make_offer:")
     assert '"amount": 100' in bob_sees
     assert "private_note" not in bob_sees and "real floor" not in bob_sees
 
@@ -99,17 +99,37 @@ def test_unknown_tool_and_bad_arguments_come_back_as_errors(scenario):
 # ----------------------------------------------------------------------------- rounds and the clock
 
 
-def test_clock_advances_per_round_and_pauses_on_request(scenario):
+def test_clock_pauses_while_a_question_is_open(scenario):
     turns = {
         "alice": [[use("open_ticket")], [use("make_offer", ticket_id="T-1", amount=100)], [say("sent")],
-                  [say("It ships in a week.")]],
-        "bob": [[use("ask_question", question="When does it ship?")], [say("thanks")], [say("Thinking it over.")]],
+                  [use("make_offer", ticket_id="T-1", amount=90)], [say("answered")]],
+        "bob": [[use("ask_question", question="When does it ship?")], [say("Thinking it over.")]],
     }
-    result = run_episode(toy_config(days_per_round=2), scenario, PROMPTS, scripted(turns))
-    # round 0 paused by ask_question (day stays 0); round 1 advances to 2; round 2 has nothing to do
+    result = run_episode(toy_config(days_per_round=7), scenario, PROMPTS, scripted(turns))
+    # round 0: bob's question pauses the clock; round 1: alice's offer answers it, and the
+    # resolving round still does not advance; round 2 has nothing to do and advances to 7.
     assert result.end_reason == "quiescent"
-    assert result.day == 4 and result.rounds == 3
-    assert [r["day"] for r in result.tool_log] == [0, 0, 0]
+    assert (result.rounds, result.day) == (3, 7)
+    assert result.world["truth"]["day"] == 7 and result.world["truth"]["clock_paused"] is False
+    assert [r["day"] for r in result.tool_log] == [0, 0, 0, 0]
+
+
+def test_run_ends_at_max_days(scenario):
+    turns = {"alice": [[use("open_ticket")]] + [[use("make_offer", ticket_id="T-1", amount=1)], [say(".")]] * 10,
+             "bob": [[use("send_note", text="Too high.")], [say(".")]] * 10}
+    result = run_episode(toy_config(days_per_round=30, max_days=90, max_rounds=50), scenario, PROMPTS, scripted(turns))
+    assert result.end_reason == "deadline" and result.day == 90 and result.rounds == 3
+
+
+def test_agents_never_see_the_day(scenario):
+    turns = {"alice": [[use("open_ticket")]] + [[use("make_offer", ticket_id="T-1", amount=1)], [say(".")]] * 4,
+             "bob": [[say(".")]] * 4}
+    model = scripted(turns)
+    result = run_episode(toy_config(days_per_round=4219, max_rounds=3), scenario, PROMPTS, model)
+    assert result.day > 0
+    for request in model.requests:
+        text = json.dumps(request)
+        assert "Day" not in text and "4219" not in text and "8438" not in text
 
 
 def test_round_cap_ends_the_run(scenario):
@@ -169,7 +189,7 @@ def test_round_end_hook_runs_with_the_new_day():
     seen = []
     scen = toy_scenario(on_round_end=lambda s: seen.append((s.round, s.day)))
     run_episode(toy_config(days_per_round=30), scen, PROMPTS, scripted({"alice": [[say("hi")]], "bob": []}))
-    assert seen[:2] == [(1, 30), (2, 60)]
+    assert seen == [(1, 30), (2, 60)]
 
 
 # ----------------------------------------------------------------------------- probes
@@ -214,8 +234,8 @@ def test_before_first_turn_message_and_delayed_result_arrive_with_the_kickoff(sc
                          scripted({"alice": [[say(".")]], "bob": [[say(".")]]}))
     alice_first = first_user_text(result, "alice")
     assert alice_first.startswith("Sell the widget to bob.")
-    assert '[Day 0] Result from assess_risk:\n{"confident": true, "risk": "high"}' in alice_first
-    assert first_user_text(result, "bob") == "[Day 0] From alice:\nOur commander authorised this."
+    assert 'Result from assess_risk:\n{"confident": true, "risk": "high"}' in alice_first
+    assert first_user_text(result, "bob") == "From alice:\nOur commander authorised this."
     assert all(m["scripted"] for m in result.wire)
 
 

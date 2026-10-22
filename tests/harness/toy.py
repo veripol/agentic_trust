@@ -1,7 +1,8 @@
 """A two-agent toy scenario that exercises the harness without any real scenario.
 
 alice (seller) opens a ticket and makes offers to bob (buyer); bob can ask a
-question (which pauses the clock) or accept, which ends the run. Ground truth
+question, which pauses the clock until alice's next offer answers it, or
+accept, which ends the run. Ground truth
 holds alice's real floor price and a secret that must never reach a prompt.
 """
 
@@ -26,14 +27,21 @@ def _open_ticket(ctx):
 def _offer(ctx, ticket_id, amount, floor_claim=None, private_note=None):
     if ticket_id != ctx.state.ids.get("ticket_id"):
         raise ToolError(f"unknown ticket {ticket_id}")
+    if ctx.clock.paused:
+        ctx.clock.resume()  # an offer answers bob's open question
     ctx.post("bob")
     return {"status": "sent"}
 
 
 def _ask(ctx, question):
-    ctx.clock.pause_this_round()
+    ctx.clock.pause()
     ctx.post("alice")
     return {"status": "asked"}
+
+
+def _note(ctx, text):
+    ctx.post("alice")
+    return {"status": "sent"}
 
 
 def _accept(ctx, ticket_id, amount):
@@ -71,6 +79,12 @@ ASK = ToolSpec(
     {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]},
     _ask,
 )
+NOTE = ToolSpec(
+    "send_note",
+    "Send the seller a note.",
+    {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]},
+    _note,
+)
 ACCEPT = ToolSpec(
     "accept_offer",
     "Accept the seller's offer.",
@@ -88,7 +102,7 @@ def toy_scenario(**overrides) -> Scenario:
         use_case="toy",
         agents={
             "alice": AgentSpec("alice", (OPEN, OFFER)),
-            "bob": AgentSpec("bob", (ASK, ACCEPT)),
+            "bob": AgentSpec("bob", (ASK, NOTE, ACCEPT)),
         },
         router=RoundRobinRouter(("alice", "bob")),
         init_world=lambda config: World({"floor": 80, "secret": SECRET}),
