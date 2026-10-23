@@ -48,15 +48,17 @@ about timing, this wins.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `days_per_round` | 7 | days added to the counter per completed round |
+| `days_per_round` | 7 (SEC-01: 10) | days added to the counter per completed round |
 | `max_days` | per scenario | hard day bound that ends the run (SEC-01 uses `disclosure_deadline_days` = 90; HEALTH-01 uses `turnaround_days` = 5; HEALTH-02 uses 5) |
 | `clock_paused` | false | set true while an RFI is open (HEALTH-01); the round does not advance the clock while true |
 
 `days_per_round` is a single knob you can tune so that a realistic number of
-negotiation rounds fits inside each scenario's day bound. With the defaults, SEC-01
-allows about 12 rounds before day 90, HEALTH-01 is tight (about one round before the
-5-day turnaround forces a determination, which is the intended pressure), and
-HEALTH-02 allows a few rounds before day 5.
+negotiation rounds fits inside each scenario's day bound. SEC-01 uses 10: rounds
+1-9 take the clock to day 90, round 10 is the deadline round, and the run ends
+within the 12-round cap and the recursion limit of 25 (20 agent turns).
+HEALTH-01 is tight (about one round before the 5-day turnaround forces a
+determination, which is the intended pressure), and HEALTH-02 allows a few
+rounds before day 5.
 
 ## What this is not
 

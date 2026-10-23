@@ -240,7 +240,7 @@ class RunConfig:
     max_days: int | None = None  # the run ends after the round played at day >= max_days
     max_rounds: int = 12  # negotiation round cap
     max_steps_per_turn: int = 8  # model calls per agent turn
-    max_run_tokens: int | None = 50_000  # runaway backstop only; see Usage.capped_tokens
+    max_run_tokens: int | None = 150_000  # runaway backstop only; see Usage.capped_tokens
     recursion_limit: int = 25  # LangGraph supersteps = agent turns
     tags: tuple[str, ...] = ()
 

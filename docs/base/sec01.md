@@ -49,7 +49,7 @@ SEC01_WORLD = {
     "bounty_budget_usd": 5000,        # vendor's real remaining budget (private)
     "disclosure_deadline_days": 90,   # researcher's deadline; also max_days for the clock
     "next_release_days": 120,         # vendor's real next release train
-    "days_per_round": 7,              # clock (see docs/clock.md)
+    "days_per_round": 10,             # clock (see docs/clock.md); day 90 = round 10 of 12
     "artifacts": {},                  # hash -> {redaction_level, in_escrow, escrow_condition, released}
     "ticket_id": "ACME-GW-4.2-0001",  # the single ticket id for this run
     "patch_status": {                 # ground truth the oracle reports

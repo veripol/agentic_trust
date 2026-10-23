@@ -206,7 +206,7 @@ presence never signals when to use it.
 
 1. Harness (state, Claim logger, build_prompt, graph, models) + tests.
 2. registry.py (all 24 goals) + test.
-3. SEC-01 end to end; run one goal 20× on Claude; verify traces. STOP and check.
+3. SEC-01 end to end; run one goal 10× on Claude; verify traces. STOP and check.
 4. SEC-03, then HEALTH-01, then HEALTH-02 — same pattern each.
 5. runner/ (LangSmith datasets + evaluators); dry run.
 6. Full sweep (cheap model first, then Claude).
