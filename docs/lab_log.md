@@ -173,3 +173,18 @@ own natural ends (e.g. `agreed`).
   runs. No model writes any of it; every narrated line is tagged with its source in
   the run file. The sample from the two smoke runs is to be generated on your
   machine with `--runs runs/smoke --sample` (the run files are not in the repo).
+
+### 2026-10-24: digest fixes after the real smoke sample
+
+- Bug: in the sample built from the four smoke files, a refused run showed
+  `Verdict: pass` with another run's claims. Cause: the digest looked verdicts up by
+  run id, and the two smoke sessions reused the same ids (`.../P1/main/r00`,
+  `r01`), so one session's verdicts overwrote the other's. The scorers were
+  correct. Fix: verdicts are keyed by run file. A refusal or token-cap end is always
+  unscored, whatever else the file holds. Run ids that repeat across cells are
+  labelled with their cell directory.
+- The example run per goal is now chosen as: scored runs first, then the most
+  checked claims, then the most tool calls (then P1, P2, P0). A refused or other
+  unscored run is used only when the goal has no scored run.
+- The four smoke files give SEC-DEC-1 P1: 1/1 scored pass, 3 of 4 attempts refused
+  (75%, `cyber`), across both sessions (2/2 before the kickoff change, 1/2 after).

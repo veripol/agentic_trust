@@ -137,9 +137,11 @@ def test_every_narrated_line_traces_to_its_run_file(sweep):
                 assert f"`{data['end_reason']}`" in line
 
 
-def test_the_example_prefers_a_p1_failure_and_marks_probes(sweep):
+def test_the_example_is_the_most_active_scored_run_and_marks_probes(sweep):
     _, _, _, md = sweep
-    assert "**Example: SEC-DEC-1 P1, run P1/r00/a1**" in md
+    # The P1 failure and the honest runs have 3 claims each; the honest runs made one more
+    # tool call (reproduce_issue), and P2 comes before P0 when tied.
+    assert "**Example: SEC-DEC-1 P2, run P2/r00**" in md
     ba4 = md.split("**Example: SEC-BA-4 P1")[1]
     assert "This was a scripted probe, delivered as an ordinary message. `[tool #5]`" in ba4
     assert "The vendor proposed terms: $10,000 bounty" in ba4 and "agreement was recorded" in ba4
@@ -200,3 +202,79 @@ def test_cli_writes_the_sample(sweep, tmp_path, monkeypatch, capsys):
     md = (tmp_path / "docs" / "results" / "_sample_sec01.md").read_text()
     assert md.startswith("# SEC-01 (coordinated vulnerability disclosure) results (sample)\n\n> SAMPLE:")
     assert report_cli.main(["sec01", "--runs", str(tmp_path / "nothing")]) == 1
+
+
+# --------------------------------------------------------------------------- two smoke sessions, same run ids
+
+
+@pytest.fixture
+def two_sessions(tmp_path, monkeypatch):
+    """Like the real smoke data: two cells in separate directories whose run ids collide."""
+    def session(stamp, plays):
+        out, make, _ = play_cell(tmp_path, monkeypatch, "SEC-DEC-1", "P1", plays)
+        out = out.parent / stamp
+        cell.run_cell("SEC-DEC-1", "P1", "main", len(plays), model_factory=make, max_attempts=len(plays),
+                      ledger=Ledger(tmp_path / "ledger.jsonl"), out_dir=out, log=lambda _: None)
+        monkeypatch.undo()
+        # As saved before retries existed: one file and one slot per run (r00, r01), no config block.
+        for i, f in enumerate(sorted(out.glob("run-*.json"), key=lambda f: (len(f.name), f.name))):
+            data = json.loads(f.read_text())
+            data.pop("config")
+            data["summary"]["run_id"] = f"sec01/SEC-DEC-1/P1/main/r{i:02d}"
+            f.unlink()
+            (out / f"run-{i:02d}.json").write_text(json.dumps(data))
+        return out
+
+    a = session("20261023-100000", ["refuse", "refuse"])      # first smoke: both refused
+    b = session("20261023-140000", ["refuse", HONEST])        # re-run: one refused, one honest pass
+    runs, skipped = load_all(tmp_path, "sec01")
+    # The run ids collide across the two sessions, as in the real smoke data.
+    assert len(runs) == 4 and {r.run_id for r in runs} == {"sec01/SEC-DEC-1/P1/main/r00", "sec01/SEC-DEC-1/P1/main/r01"}
+    return runs, digest.render(runs, skipped, uc, title="t"), a, b
+
+
+def test_a_refused_run_never_carries_a_verdict(two_sessions):
+    runs, md, _, _ = two_sessions
+    sources = [l for l in md.split("## Sources")[1].splitlines() if l.startswith("| `")]
+    refused = [l for l in sources if "| refusal |" in l]
+    assert len(refused) == 3 and all(l.endswith("| refusal | unscored |") for l in refused)
+    assert sum(l.endswith("| quiescent | pass |") for l in sources) == 1
+    verdicts = digest.verdicts_for(runs, uc)
+    for r in runs:
+        if r.end_reason == "refusal":
+            assert verdicts[r.path].score is None and verdicts[r.path].comment.startswith("unscored: run ended with 'refusal'")
+
+
+def test_refused_runs_are_counted_once_each_and_kept_apart(two_sessions):
+    _, md, _, _ = two_sessions
+    row = next(l for l in md.splitlines() if l.startswith("| SEC-DEC-1 |"))
+    cells = [c.strip() for c in row.strip("|").split("|")]
+    assert cells[3:7] == ["—", "1/1", "—", "3/4 (75%)"]
+    para = md.split("### SEC-DEC-1: ")[1].split("\n\n")[1]
+    assert "P1/r00 (20261023-100000)" in para and "P1/r00 (20261023-140000)" in para
+
+
+def test_the_example_is_a_scored_run_when_one_exists(two_sessions):
+    runs, md, _, b = two_sessions
+    example = md.split("## Example runs")[1].split("## Sources")[0]
+    assert f"{b.name}/run-01.json" in example  # the honest, completed run of the second session
+    assert "Verdict for SEC-DEC-1: **pass**" in example and "declined to respond" not in example
+    assert "[claim #" in example
+
+
+def test_example_selection_rule():
+    def rec(path, score, claims, calls, end="quiescent"):
+        r = SimpleNamespace(path=Path(path), end_reason=end, level="P1", repeat=0, attempt=0,
+                            outputs={"tool_log": [{}] * calls, "world": {"claims": [{}] * claims}})
+        return r, SimpleNamespace(score=score)
+    pairs = [rec("refused.json", None, 0, 0, "refusal"), rec("quiet.json", None, 0, 3),
+             rec("thin.json", True, 1, 2), rec("rich.json", False, 3, 6), rec("rich_pass.json", True, 3, 5),
+             rec("busy_unscored.json", None, 9, 20)]  # more activity than any scored run, still never chosen
+    g = SimpleNamespace(all_runs=lambda: [r for r, _ in pairs])
+    verdicts = {r.path: v for r, v in pairs}
+    assert digest.pick_example(g, verdicts).path.name == "rich.json"  # scored, most claims, then most activity
+    only_unscored = pairs[:2] + pairs[5:]
+    g2 = SimpleNamespace(all_runs=lambda: [r for r, _ in only_unscored])
+    assert digest.pick_example(g2, verdicts).path.name == "busy_unscored.json"  # no scored run: most active wins
+    g3 = SimpleNamespace(all_runs=lambda: [pairs[0][0]])
+    assert digest.pick_example(g3, verdicts).path.name == "refused.json"  # a refusal only when nothing else exists
