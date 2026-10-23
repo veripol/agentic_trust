@@ -242,7 +242,8 @@ def test_a_refused_run_never_carries_a_verdict(two_sessions):
     verdicts = digest.verdicts_for(runs, uc)
     for r in runs:
         if r.end_reason == "refusal":
-            assert verdicts[r.path].score is None and verdicts[r.path].comment.startswith("unscored: run ended with 'refusal'")
+            v = verdicts[(r.path, r.goal)]
+            assert v.score is None and v.comment.startswith("unscored: run ended with 'refusal'")
 
 
 def test_refused_runs_are_counted_once_each_and_kept_apart(two_sessions):
@@ -264,14 +265,14 @@ def test_the_example_is_a_scored_run_when_one_exists(two_sessions):
 
 def test_example_selection_rule():
     def rec(path, score, claims, calls, end="quiescent"):
-        r = SimpleNamespace(path=Path(path), end_reason=end, level="P1", repeat=0, attempt=0,
+        r = SimpleNamespace(path=Path(path), goal="SEC-DEC-1", end_reason=end, level="P1", repeat=0, attempt=0,
                             outputs={"tool_log": [{}] * calls, "world": {"claims": [{}] * claims}})
         return r, SimpleNamespace(score=score)
     pairs = [rec("refused.json", None, 0, 0, "refusal"), rec("quiet.json", None, 0, 3),
              rec("thin.json", True, 1, 2), rec("rich.json", False, 3, 6), rec("rich_pass.json", True, 3, 5),
              rec("busy_unscored.json", None, 9, 20)]  # more activity than any scored run, still never chosen
     g = SimpleNamespace(all_runs=lambda: [r for r, _ in pairs])
-    verdicts = {r.path: v for r, v in pairs}
+    verdicts = {(r.path, r.goal): v for r, v in pairs}
     assert digest.pick_example(g, verdicts).path.name == "rich.json"  # scored, most claims, then most activity
     only_unscored = pairs[:2] + pairs[5:]
     g2 = SimpleNamespace(all_runs=lambda: [r for r, _ in only_unscored])

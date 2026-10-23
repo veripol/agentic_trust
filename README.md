@@ -63,6 +63,22 @@ before spending. Total spend is capped at $100. Every model call is recorded in
 `spend_ledger.jsonl`. Commit that file after runs, so the cap still counts this
 spend after a fresh checkout.
 
+## Sweep
+
+```bash
+python -m agentic_trust.runner.sweep --plan   # cells, runs to go, cost estimate; no keys, no spend
+python -m agentic_trust.runner.sweep          # run it: asks once, then writes the digest
+```
+
+The SEC-01 sweep runs 25 cells: one shared P0 cell, then goal by goal. The shared
+cell scores every goal that has no probe or arm change. Probe goals and control
+arms get P0 cells of their own. Every goal and arm has P1 and P2 cells. Each cell
+targets 10 completed runs, with refused runs re-run. The sweep prints a running
+tally after every run and stops cleanly at the $100 ceiling. It is resumable:
+rerun the same command and it skips complete cells and continues partial ones from
+their saved run files, so nothing is paid twice. Raw runs go to `runs/sweep/sec01/`
+(gitignored). The digest goes to `docs/results/sec01.md` (tracked; commit it).
+
 ## Results
 
 After a use case's sweep, write its digest from the saved run files (no API calls):

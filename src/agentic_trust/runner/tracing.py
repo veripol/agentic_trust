@@ -122,3 +122,15 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def flush_quietly() -> None:
+    """flush(), but never let a tracing problem stop a paid sweep; does nothing unless
+    tracing is on and a key is set."""
+    st = status()
+    if not (st.enabled and st.api_key_present):
+        return
+    try:
+        flush()
+    except Exception as exc:  # report and carry on: the runs themselves are saved to disk
+        print(f"(tracing flush failed: {type(exc).__name__}: {exc})")

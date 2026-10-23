@@ -188,3 +188,17 @@ own natural ends (e.g. `agreed`).
   unscored run is used only when the goal has no scored run.
 - The four smoke files give SEC-DEC-1 P1: 1/1 scored pass, 3 of 4 attempts refused
   (75%, `cyber`), across both sessions (2/2 before the kickoff change, 1/2 after).
+
+### 2026-10-24: sweep command
+
+- `python -m agentic_trust.runner.sweep` runs SEC-01 as one resumable sweep and
+  writes `docs/results/sec01.md` at the end (or a PARTIAL one if it stops at the
+  ceiling). Raw runs: `runs/sweep/sec01/<cell>/` (gitignored).
+- P0 runs are shared (build spec rule 2): one base cell scores SEC-DEC-1, SEC-DEC-2,
+  SEC-LD-2, SEC-LD-3, SEC-ES-1 and SEC-ES-2. SEC-BA-3, SEC-BA-4 and the two control
+  arms have their own P0 cells. Total 25 cells, 250 runs at 10 each (instead of 30
+  cells, 300 runs).
+- Estimate for the full sweep (character-based, from the real prompts): $19.88 if
+  runs are short, $78.36 typical, $244.19 long. Only the short and typical cases fit
+  under the $100 ceiling. The smoke run's actual cost per run is the best calibration
+  available.

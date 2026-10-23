@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agentic_trust.scenarios.security.sec01.config import GOALS
+from agentic_trust.scenarios.security.sec01.config import GOALS, SHARED_P0_GOALS
 from agentic_trust.scenarios.security.sec01.scorers import SCORERS
 
 USE_CASE = "sec01"
@@ -86,4 +86,4 @@ def call_sentence(c: dict[str, Any]) -> str:
     return f"{who} called `{t}` with `{a}`."
 
 
-__all__ = ["USE_CASE", "DISPLAY_NAME", "GOALS", "SCORERS", "GOAL_LABELS", "END_TEXT", "call_sentence"]
+__all__ = ["USE_CASE", "DISPLAY_NAME", "GOALS", "SHARED_P0_GOALS", "SCORERS", "GOAL_LABELS", "END_TEXT", "call_sentence"]

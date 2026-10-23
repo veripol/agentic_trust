@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -39,19 +39,19 @@ LOW = 0.5
 @dataclass
 class LevelStats:
     runs: list[RunRecord]  # every attempt at this level, refused ones included
-    verdicts: dict[Path, Verdict]  # keyed by file: run ids can repeat across cells
+    verdicts: dict[tuple[Path, str], Verdict]  # (file, goal): run ids can repeat; shared P0 files score several goals
 
     @property
     def scored(self) -> list[RunRecord]:
-        return [r for r in self.runs if self.verdicts[r.path].score is not None]
+        return [r for r in self.runs if self.verdicts[(r.path, r.goal)].score is not None]
 
     @property
     def passes(self) -> int:
-        return sum(self.verdicts[r.path].score is True for r in self.runs)
+        return sum(self.verdicts[(r.path, r.goal)].score is True for r in self.runs)
 
     @property
     def fails(self) -> list[RunRecord]:
-        return [r for r in self.runs if self.verdicts[r.path].score is False]
+        return [r for r in self.runs if self.verdicts[(r.path, r.goal)].score is False]
 
     @property
     def refused(self) -> list[RunRecord]:
@@ -60,7 +60,7 @@ class LevelStats:
     @property
     def unscored(self) -> list[RunRecord]:
         """Unscored for any reason other than a refusal (those are counted separately)."""
-        return [r for r in self.runs if self.verdicts[r.path].score is None and r.end_reason != "refusal"]
+        return [r for r in self.runs if self.verdicts[(r.path, r.goal)].score is None and r.end_reason != "refusal"]
 
     @property
     def rate(self) -> float | None:
@@ -90,12 +90,29 @@ def verdict(r: RunRecord, uc) -> Verdict:
     return uc.SCORERS[r.goal](r.outputs)
 
 
-def verdicts_for(runs: list[RunRecord], uc) -> dict[Path, Verdict]:
-    """One verdict per run file, keyed by its path (run ids are not unique across cells)."""
-    return {r.path: verdict(r, uc) for r in runs}
+SHARED = "base"  # the goal name a shared P0 run file is saved under
 
 
-def aggregate(runs: list[RunRecord], uc, verdicts: dict[Path, Verdict] | None = None) -> list[GoalStats]:
+def expand_shared(runs: list[RunRecord], uc) -> list[RunRecord]:
+    """A shared P0 run counts once for each goal it scores (build spec rule 2): the same
+    file appears as one record per goal in uc.SHARED_P0_GOALS."""
+    out = []
+    for r in runs:
+        if r.goal == SHARED:
+            out += [replace(r, goal=g) for g in getattr(uc, "SHARED_P0_GOALS", ())]
+        else:
+            out.append(r)
+    return out
+
+
+def verdicts_for(runs: list[RunRecord], uc) -> dict[tuple[Path, str], Verdict]:
+    """One verdict per (run file, goal). Run ids are not unique across cells, and a shared
+    P0 file is scored for several goals."""
+    return {(r.path, r.goal): verdict(r, uc) for r in runs}
+
+
+def aggregate(runs: list[RunRecord], uc, verdicts: dict | None = None) -> list[GoalStats]:
+    runs = expand_shared(runs, uc)
     verdicts = verdicts_for(runs, uc) if verdicts is None else verdicts
     keys = sorted({(r.goal, r.arm) for r in runs}, key=lambda k: (list(uc.GOALS).index(k[0]), k[1] != "main", k[1]))
     out = []
@@ -170,7 +187,8 @@ def set_labels(runs: list[RunRecord]) -> None:
     _LABELS.clear()
     seen = Counter(r.run_id for r in runs)
     for r in runs:
-        _LABELS[r.path] = f"{r.short_id} ({r.path.parent.name})" if seen[r.run_id] > 1 else r.short_id
+        text = f"{r.short_id} ({r.path.parent.name})" if seen[r.run_id] > 1 else r.short_id
+        _LABELS[r.path] = text + (" shared" if r.goal == SHARED else "")
 
 
 def _ids(runs: Iterable[RunRecord]) -> str:
@@ -212,14 +230,14 @@ def paragraph(g: GoalStats, uc) -> list[str]:
         parts.append(f"{len(refused)} attempt(s) were refused by the model ({_ids(refused)}){tail}.")
     unscored = [r for lv in LEVELS for r in g.levels[lv].unscored]
     if unscored:
-        why = Counter(g.levels[r.level].verdicts[r.path].comment for r in unscored)
+        why = Counter(g.levels[r.level].verdicts[(r.path, r.goal)].comment for r in unscored)
         parts.append(f"{len(unscored)} run(s) were unscored: " + "; ".join(
             f"{reason.removeprefix('unscored: ')} ({n})" for reason, n in why.most_common()) + ".")
     fails = [r for lv in LEVELS for r in g.levels[lv].fails]
     if fails:
         grouped: dict[str, list[RunRecord]] = {}
         for r in fails:
-            grouped.setdefault(g.levels[r.level].verdicts[r.path].comment.removeprefix("fail: "), []).append(r)
+            grouped.setdefault(g.levels[r.level].verdicts[(r.path, r.goal)].comment.removeprefix("fail: "), []).append(r)
         parts.append("Failures: " + "; ".join(
             f"{why} ({_ids(rs)})" for why, rs in sorted(grouped.items(), key=lambda kv: -len(kv[1]))) + ".")
     elif g.all_runs():
@@ -230,7 +248,7 @@ def paragraph(g: GoalStats, uc) -> list[str]:
 # --------------------------------------------------------------------------- (c) narrated example run
 
 
-def pick_example(g: GoalStats, verdicts: dict[Path, Verdict]) -> RunRecord | None:
+def pick_example(g: GoalStats, verdicts: dict) -> RunRecord | None:
     """The run that best shows the goal's behaviour. Scored runs first; among them the one
     with the most checked claims, then the most tool calls; then P1, P2, P0 and file order.
     A refused or otherwise unscored run is chosen only when the goal has no scored run."""
@@ -241,7 +259,7 @@ def pick_example(g: GoalStats, verdicts: dict[Path, Verdict]) -> RunRecord | Non
 
     def key(r):
         o = r.outputs
-        return (verdicts[r.path].score is None, r.end_reason == "refusal", -len(o["world"]["claims"]),
+        return (verdicts[(r.path, r.goal)].score is None, r.end_reason == "refusal", -len(o["world"]["claims"]),
                 -len(o["tool_log"]), order.get(r.level, 3), str(r.path))
 
     return min(runs, key=key)
@@ -301,7 +319,7 @@ def narrate(r: RunRecord, g: GoalStats, uc) -> list[str]:
     end = o["end_reason"]
     why = uc.END_TEXT.get(end) or END_REASONS.get(end, end)
     lines.append(f"- The run ended `{end}`: {why}, after {o['rounds']} completed round(s), on day {o['day']}. `[end_reason]`")
-    v = g.levels[r.level].verdicts[r.path]
+    v = g.levels[r.level].verdicts[(r.path, r.goal)]
     score = {True: "pass", False: "fail", None: "unscored"}[v.score]
     detail = v.comment.split(": ", 1)[1] if ": " in v.comment else v.comment
     lines.append(f"- Verdict for {g.goal}: **{score}**: {detail}. `[scorer]`")
@@ -316,7 +334,8 @@ def narrate(r: RunRecord, g: GoalStats, uc) -> list[str]:
 
 def render(runs: list[RunRecord], skipped: list[tuple[Any, str]], uc, *, title: str, banner: str = "") -> str:
     set_labels(runs)
-    verdicts = verdicts_for(runs, uc)
+    expanded = expand_shared(runs, uc)
+    verdicts = verdicts_for(expanded, uc)
     stats = aggregate(runs, uc, verdicts)
     models = sorted({(r.outputs.get("model"), r.outputs.get("effort")) for r in runs})
     out = [f"# {title}", ""]
@@ -337,9 +356,15 @@ def render(runs: list[RunRecord], skipped: list[tuple[Any, str]], uc, *, title: 
         if ex is not None:
             out += narrate(ex, g, uc) + [""]
     out += ["## Sources", "", "| File | Run id | Goal | Level | Arm | End | Verdict |", "| --- | --- | --- | --- | --- | --- | --- |"]
+    word = {True: "pass", False: "fail", None: "unscored"}
     for r in sorted(runs, key=lambda r: str(r.path)):
-        s = {True: "pass", False: "fail", None: "unscored"}[verdicts[r.path].score]
-        out.append(f"| `{show_path(r.path)}` | `{r.run_id}` | {r.goal} | {r.level} | {r.arm} | {r.end_reason} | {s} |")
+        if r.goal == SHARED:
+            goals = getattr(uc, "SHARED_P0_GOALS", ())
+            goal = f"shared P0 ({len(goals)} goals)"
+            s = "; ".join(f"{g} {word[verdicts[(r.path, g)].score]}" for g in goals)
+        else:
+            goal, s = r.goal, word[verdicts[(r.path, r.goal)].score]
+        out.append(f"| `{show_path(r.path)}` | `{r.run_id}` | {goal} | {r.level} | {r.arm} | {r.end_reason} | {s} |")
     if skipped:
         out += ["", "Skipped (not used for any number above):", ""]
         out += [f"- `{show_path(Path(p))}`: {why}" for p, why in skipped]

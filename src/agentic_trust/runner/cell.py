@@ -56,8 +56,26 @@ def budget_check(est: dict, ledger: Ledger, limit: float = PROJECT_BUDGET_USD) -
     return spent, high, spent + high > limit
 
 
+def saved_summaries(out_dir: Path) -> list[dict]:
+    """Summaries of the runs already saved in a cell directory, in the order they ran."""
+    found = []
+    for f in out_dir.glob("run-*.json") if out_dir.exists() else []:
+        s = json.loads(f.read_text())["summary"]
+        found.append(s)
+    return sorted(found, key=lambda s: (s.get("repeat", 0), s.get("attempt", 0)))
+
+
+def resume_point(summaries: list[dict]) -> tuple[int, int]:
+    """(next slot, its retry number) after the runs already saved: slots fill in order,
+    and a slot is done once it has a run that was not refused."""
+    done = {s["repeat"] for s in summaries if s["end_reason"] != "refusal"}
+    repeat = len(done)
+    attempt = sum(1 for s in summaries if s["repeat"] == repeat and s["end_reason"] == "refusal")
+    return repeat, attempt
+
+
 def run_cell(
-    goal: str, level: str, arm: str, target: int, *,
+    goal: str | None, level: str, arm: str, target: int, *,
     model_factory: Callable[[ModelSettings], AgentModel],
     ledger: Ledger,
     out_dir: Path,
@@ -65,17 +83,25 @@ def run_cell(
     log: Callable[[str], None] = print,
     limit_usd: float = PROJECT_BUDGET_USD,
     max_attempts: int | None = None,
+    resume: bool = False,
+    on_run: Callable[[dict], None] | None = None,
 ) -> list[dict]:
     """Run until ``target`` runs finish without a refusal, or ``max_attempts`` (default
     2 x target) attempts are used. A refused run is unscored and re-run under a new run
     id; every attempt, refused or not, is saved and returned. Stops early if the budget
-    guard refuses a call."""
+    guard refuses a call.
+
+    ``goal=None`` is the shared P0 cell: base prompts for both agents, scored per goal in
+    the digest (build spec rule 2). ``resume=True`` continues from the runs already saved
+    in ``out_dir`` instead of starting over; those count toward the target and the cap.
+    ``on_run`` is called with each new run's summary."""
     out_dir.mkdir(parents=True, exist_ok=True)
     max_attempts = 2 * target if max_attempts is None else max_attempts
-    summaries: list[dict] = []
-    repeat, attempt = 0, 0  # the slot being filled, and its retry number
+    name = goal or "base"
+    summaries: list[dict] = saved_summaries(out_dir) if resume else []
+    repeat, attempt = resume_point(summaries) if resume else (0, 0)  # the slot being filled, and its retry number
     while repeat < target and len(summaries) < max_attempts:
-        run_id = f"{sec01.USE_CASE}/{goal}/{level}/{arm}/r{repeat:02d}" + (f"/a{attempt}" if attempt else "")
+        run_id = f"{sec01.USE_CASE}/{name}/{level}/{arm}/r{repeat:02d}" + (f"/a{attempt}" if attempt else "")
         cfg = sec01.make_config(goal, level, arm, repeat, tags=tags, run_id=run_id)
         model = BudgetedModel(model_factory(ModelSettings(model=cfg.model, effort=cfg.effort)), ledger, cfg.run_id, limit_usd)
         label = f"[{len(summaries) + 1}, slot {repeat + 1}/{target}]"
@@ -84,10 +110,13 @@ def run_cell(
             result = run_episode(cfg, sec01.SCENARIO, build_prompts(cfg), model)
         except BudgetExceeded as exc:
             log(f"{label} {cfg.run_id}: STOPPED by the budget guard: {exc}")
-            summaries.append({"run_id": cfg.run_id, "repeat": repeat, "attempt": attempt,
-                              "end_reason": "budget_stop", "error": str(exc)})
+            stop = {"run_id": cfg.run_id, "repeat": repeat, "attempt": attempt,
+                    "end_reason": "budget_stop", "error": str(exc)}
+            summaries.append(stop)
+            if on_run:
+                on_run(stop)
             break
-        verdict = SCORERS[goal](result.outputs())
+        verdict = SCORERS[goal](result.outputs()) if goal else _SHARED
         refusals = result.world["truth"].get("refusals", [])
         summary = {
             "run_id": cfg.run_id,
@@ -105,9 +134,9 @@ def run_cell(
                         "needs_review": verdict.needs_review},
         }
         summaries.append(summary)
-        name = f"run-{repeat:02d}" + (f"-a{attempt}" if attempt else "") + ".json"
-        (out_dir / name).write_text(json.dumps({
-            "config": {"run_id": cfg.run_id, "use_case": cfg.use_case, "goal": goal, "level": level, "arm": arm,
+        fname = f"run-{repeat:02d}" + (f"-a{attempt}" if attempt else "") + ".json"
+        (out_dir / fname).write_text(json.dumps({
+            "config": {"run_id": cfg.run_id, "use_case": cfg.use_case, "goal": name, "level": level, "arm": arm,
                        "repeat": repeat, "attempt": attempt, "tags": list(cfg.tags),
                        "model": cfg.model, "effort": cfg.effort},
             "summary": summary, "outputs": result.outputs(), "wire": result.wire,
@@ -118,15 +147,30 @@ def run_cell(
                 f"output_tokens={r['usage']['output_tokens']}, request_id={r.get('request_id')}")
         log(f"{label} {cfg.run_id}: end={summary['end_reason']} rounds={summary['rounds']} "
             f"day={summary['day']} requests={summary['usage']['requests']} capped_tokens={summary['capped_tokens']} "
-            f"cost=${summary['cost_usd']:.3f} {goal}={verdict.score} ({verdict.comment})")
+            f"cost=${summary['cost_usd']:.3f} {name}={verdict.score} ({verdict.comment})")
+        if on_run:
+            on_run(summary)
         if result.end_reason == "refusal":
             attempt += 1  # re-run this slot
         else:
             repeat, attempt = repeat + 1, 0
     stats = cell_stats(summaries, target)
     (out_dir / "cell.json").write_text(json.dumps(
-        {"goal": goal, "level": level, "arm": arm, **stats, "runs": [s["run_id"] for s in summaries]}, indent=2))
+        {"goal": name, "level": level, "arm": arm, "max_attempts": max_attempts, **stats,
+         "runs": [s["run_id"] for s in summaries]}, indent=2))
     return summaries
+
+
+class _Shared:
+    """Verdict stand-in for shared P0 runs, which the digest scores once per goal."""
+
+    score = None
+    comment = "shared P0 run: scored per goal in the digest"
+    receiver: dict = {}
+    needs_review = False
+
+
+_SHARED = _Shared()
 
 
 def cell_stats(summaries: list[dict], target: int) -> dict:

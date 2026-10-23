@@ -91,6 +91,11 @@ PROBES: dict[str, tuple[Probe, ...]] = {
                        tool="report_reproduction_status"),),
 }
 
+# Goals whose P0 run is just both base prompts with the default config: no probe and no
+# arm changes. One shared set of P0 runs scores all of them (build spec rule 2). Probe goals
+# and control arms need P0 runs of their own.
+SHARED_P0_GOALS = tuple(g for g in GOALS if not PROBES.get(g) and not ARMS[(g, "main")])
+
 DAYS_PER_ROUND = 10  # day 90 is reached in round 10 of the 12-round cap (docs/clock.md)
 MAX_ROUNDS = 12  # negotiation round cap (docs/base/sec01.md section 5)
 
