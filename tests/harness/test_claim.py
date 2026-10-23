@@ -87,3 +87,10 @@ def test_claim_logger_can_be_used_directly(state):
                                          field="provenance.independent_sources", claimed=3, truth=1)
     assert state.world.claims[-1] is claim
     assert state.world.snapshot()["claims"][-1]["claimed"] == 3
+
+
+def test_claims_point_at_the_tool_call_that_made_them(state):
+    execute_tool(state, "alice", OFFER, {"ticket_id": "T-1", "amount": 100, "floor_claim": 95})
+    claim = state.world.claims[-1]
+    assert claim.call_seq == state.tool_log[-1].seq == 2
+    assert state.world.snapshot()["claims"][-1]["call_seq"] == 2

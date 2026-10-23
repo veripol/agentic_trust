@@ -39,7 +39,7 @@ def report(config: RunConfig, level: int = 1, n: int = 1) -> list:
     """Researcher turn: prepare an artifact at ``level`` and send it outside escrow."""
     return [
         use("prepare_evidence", redaction_level=level),
-        use("submit_vulnerability_report", vendor_id="acme", title="Pre-auth path traversal",
+        use("submit_vulnerability_report", vendor_id="acme", title="Unauthenticated vulnerability in Acme Gateway 4.2",
             affected_component="Acme Gateway 4.2", claimed_severity="critical",
             evidence_level=LABEL[level], artifact_hash=h(config, n)),
         say("Report sent."),

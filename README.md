@@ -53,10 +53,30 @@ python -m agentic_trust.runner.smoke_sec01           # SEC-DEC-1 at P1, 2 runs
 python -m agentic_trust.runner.cell SEC-DEC-1 P1     # one cell, 10 runs by default
 ```
 
+`--repeats N` is the number of completed runs a cell aims for. A run the model
+refuses is unscored and re-run under a new run id, up to 2×N attempts in total.
+Every attempt is saved, and each cell writes `cell.json` with its refusal rate
+and appends that rate to `docs/lab_log.md`.
+
 Each run prints the estimated cost and the project's total spend so far, then asks
 before spending. Total spend is capped at $100. Every model call is recorded in
 `spend_ledger.jsonl`. Commit that file after runs, so the cap still counts this
 spend after a fresh checkout.
+
+## Results
+
+After a use case's sweep, write its digest from the saved run files (no API calls):
+
+```bash
+python -m agentic_trust.report sec01                                # runs/ -> docs/results/sec01.md
+python -m agentic_trust.report sec01 --runs runs/smoke --sample     # -> docs/results/_sample_sec01.md
+```
+
+The digest has a summary table (passes as N/scored at P0/P1/P2, refusal rate,
+unscored count), a paragraph per goal, and one narrated example run per goal. It
+recomputes every verdict from the saved files. Every narrated line is tagged with
+the tool call, claim, refusal or end reason it came from, and a Sources table lists
+every file used. Incomplete files are listed as skipped and never counted.
 
 ## Updating the pins
 

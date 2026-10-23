@@ -42,6 +42,7 @@ class Claim:
     claimed: Any
     truth: Any
     scripted: bool = False
+    call_seq: int | None = None  # the tool-log seq of the call that made this claim
 
     @property
     def matches(self) -> bool:
@@ -58,6 +59,7 @@ class Claim:
             "claimed": copy.deepcopy(self.claimed),
             "truth": copy.deepcopy(self.truth),
             "scripted": self.scripted,
+            "call_seq": self.call_seq,
         }
 
 
@@ -77,6 +79,7 @@ class ClaimLogger:
         claimed: Any,
         truth: Any,
         scripted: bool = False,
+        call_seq: int | None = None,
     ) -> Claim:
         claim = Claim(
             seq=len(self.world.claims) + 1,
@@ -88,6 +91,7 @@ class ClaimLogger:
             claimed=copy.deepcopy(claimed),
             truth=copy.deepcopy(truth),
             scripted=scripted,
+            call_seq=call_seq,
         )
         self.world.claims.append(claim)
         return claim
@@ -214,6 +218,7 @@ def execute_tool(
                     claimed=args[field_name],
                     truth=truth_fn(state.world, args, result),
                     scripted=scripted,
+                    call_seq=len(state.tool_log) + 1,  # the record _record is about to append
                 )
     _record(state, agent, spec.name, args, outcome, scripted)
     return outcome

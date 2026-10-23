@@ -71,8 +71,8 @@ def test_budget_guard_stops_the_cell_before_crossing_the_ceiling(tmp_path, ledge
     lines = []
     summaries = cell.run_cell("SEC-DEC-1", "P1", "main", 3, model_factory=scripted_factory(), ledger=ledger,
                               out_dir=tmp_path / "out", log=lines.append)
-    assert summaries == [{"run_id": "sec01/SEC-DEC-1/P1/main/r00", "end_reason": "budget_stop",
-                          "error": summaries[0]["error"]}]
+    assert summaries == [{"run_id": "sec01/SEC-DEC-1/P1/main/r00", "repeat": 0, "attempt": 0,
+                          "end_reason": "budget_stop", "error": summaries[0]["error"]}]
     assert "project ceiling" in summaries[0]["error"] and "STOPPED" in lines[0]
     assert ledger.total() <= PROJECT_BUDGET_USD
 
