@@ -30,8 +30,21 @@ def _code_after(text: str, marker: str) -> str:
 
 def test_base_prompts_are_verbatim_from_the_build_spec():
     spec = _spec_sec01()
-    assert P.RESEARCHER_BASE.strip() == _code_after(spec, "### Researcher base prompt")
+    # The researcher prompt is the spec's, plus one framing paragraph (docs/lab_log.md, 2026-10-23).
+    without_framing = P.RESEARCHER_BASE.replace(P.DISCLOSURE_FRAMING + "\n\n", "", 1)
+    assert without_framing != P.RESEARCHER_BASE
+    assert without_framing.strip() == _code_after(spec, "### Researcher base prompt")
     assert P.VENDOR_BASE.strip() == _code_after(spec, "### Vendor base prompt")
+
+
+@pytest.mark.parametrize("level", ["P0", "P1", "P2"])
+def test_disclosure_framing_is_in_every_researcher_prompt_and_never_the_vendor(level):
+    for goal in GOALS:
+        prompts = P.build_prompts(make_config(goal, level))
+        assert P.DISCLOSURE_FRAMING in prompts["researcher"]
+        assert "responsible-disclosure" not in prompts["vendor"]
+    p = P.build_prompts(make_config("SEC-LD-2", "P2"))["researcher"]
+    assert p.index("solely\nin your principal's interest.") < p.index("good-faith") < p.index("objectives, in priority order")
 
 
 @pytest.mark.parametrize("goal", list(GOALS))

@@ -343,9 +343,11 @@ class _Episode:
             self._count(agent, turn.usage)
             history.append({"role": "assistant", "content": turn.content})
             if turn.stop_reason == "refusal":
-                state.world.setdefault("refusals", []).append(
-                    {"agent": agent, "round": state.round, "stop_details": turn.stop_details}
-                )
+                state.world.setdefault("refusals", []).append({
+                    "agent": agent, "round": state.round, "stop_reason": turn.stop_reason,
+                    "stop_details": turn.stop_details, "content": turn.content,
+                    "usage": turn.usage.to_dict(), "model": turn.model, "request_id": turn.request_id,
+                })
                 state.end("refusal")
                 return
             if turn.stop_reason == "max_tokens":

@@ -95,6 +95,10 @@ def run_cell(
         (out_dir / f"run-{repeat:02d}.json").write_text(json.dumps(
             {"summary": summary, "outputs": result.outputs(), "wire": result.wire,
              "transcripts": result.transcripts, "prompts": result.prompts}, indent=2, default=str))
+        for r in result.world["truth"].get("refusals", []):
+            d = r.get("stop_details") or {}
+            log(f"    refusal: {r['agent']} round {r['round']}, category={d.get('category')!r}, "
+                f"output_tokens={r['usage']['output_tokens']}, request_id={r.get('request_id')}")
         log(f"[{repeat + 1}/{repeats}] {cfg.run_id}: end={summary['end_reason']} rounds={summary['rounds']} "
             f"day={summary['day']} requests={summary['usage']['requests']} capped_tokens={summary['capped_tokens']} "
             f"cost=${summary['cost_usd']:.3f} {goal}={verdict.score} ({verdict.comment})")
