@@ -96,3 +96,16 @@ own natural ends (e.g. `agreed`).
 - Estimate for a 10-run SEC-DEC-1 P1 cell: $0.79 short / $3.13 typical /
   $9.76 long. No profile reaches the 150k cap (long runs ~103k). The 2-run smoke
   test: $0.16 / $0.63 / $1.95.
+
+### 2026-10-23: first smoke attempt failed before any API call (no charge)
+
+- In Anaconda base, the Anthropic client crashed on its first response:
+  `TypeError: Decompressor.decompress() got an unexpected keyword argument
+  'output_buffer_limit'`. Cause: anthropic 2.1.0 uses httpx2 2.16.0, which decodes
+  brotli with whichever brotli library is installed and needs `brotli` >= 1.2.0 or
+  `brotlicffi` >= 1.2.0.2. Anaconda base had an older one. Reproduced with
+  `brotlicffi` 1.1.0.0, and fixed by `brotli` >= 1.2.0, which httpx2 prefers.
+- Fix: pinned anthropic, httpx2/httpcore2, httpx/httpcore and langsmith; required
+  `brotli>=1.2.0`; added `requirements.lock`. Added a preflight check that runs
+  before every paid cell, and a README requirement to use a clean venv. Verified a
+  from-scratch venv install, with the old `brotlicffi` pre-installed: 188 tests pass.

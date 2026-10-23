@@ -6,9 +6,23 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
 dependencies = [
-    "anthropic>=2.1,<3",
+    # HTTP stack, pinned to the versions the test suite runs on. anthropic and
+    # langsmith use httpx2/httpcore2; langchain-core and langgraph use httpx/httpcore.
+    "anthropic==2.1.0",
+    "httpx2==2.16.0",
+    "httpcore2==2.16.0",
+    "httpx==0.28.1",
+    "httpcore==1.0.9",
+    # httpx2 decodes brotli responses with whichever brotli library is installed and
+    # needs one new enough to accept output_buffer_limit. An older one (Anaconda base
+    # ships one) fails with "Decompressor.decompress() got an unexpected keyword
+    # argument 'output_buffer_limit'". httpx2 prefers `brotli` when both are present.
+    "brotli>=1.2.0; platform_python_implementation == 'CPython'",
+    "brotlicffi>=1.2.0.2; platform_python_implementation != 'CPython'",
+    "langsmith==0.14.12",
     "langgraph>=1.2,<2",
     "jsonschema>=4.23,<5",
+    "packaging>=23.2",
     "python-dotenv>=1.0",
 ]
 

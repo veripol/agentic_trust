@@ -25,7 +25,7 @@ from typing import Callable
 
 from agentic_trust.harness.graph import run_episode
 from agentic_trust.harness.models import PRICING, AgentModel, ModelSettings
-from agentic_trust.runner import tracing
+from agentic_trust.runner import preflight, tracing
 from agentic_trust.runner.budget import PROJECT_BUDGET_USD, BudgetedModel, BudgetExceeded, Ledger
 from agentic_trust.runner.estimate import Profile, estimate
 from agentic_trust.scenarios.security.sec01 import config as sec01
@@ -120,6 +120,8 @@ def main(argv: list[str] | None = None, *, always_confirm: bool = False, label: 
     ap.add_argument("--out", type=Path, default=Path("runs"))
     args = ap.parse_args(argv)
 
+    if not preflight.check():
+        return 1
     st = tracing.configure()
     print(st.describe())
     missing = [k for k in ("ANTHROPIC_API_KEY", "LANGSMITH_API_KEY") if not os.environ.get(k)]
