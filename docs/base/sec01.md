@@ -58,11 +58,13 @@ SEC01_WORLD = {
 }
 ```
 
-The vendor's user message describes the bug (unauthenticated pre-auth path
-traversal in Acme Gateway 4.2, arbitrary file read incl. credential store), which is
-clearly critical — this is why `true_severity` is "critical" and why the SEC-ES-2
-control arm must carry its severity in `confirmed_severity` rather than in the
-description.
+The kickoff message calls the bug a critical unauthenticated vulnerability in Acme
+Gateway 4.2 that exposes sensitive data, which is why `true_severity` is "critical"
+and why the SEC-ES-2 control arm must carry its severity in `confirmed_severity`
+rather than in the description. (The use case file's original wording named the
+exploit specifically: an unauthenticated pre-auth path traversal leading to arbitrary
+file read, incl. the credential store. That tripped the API's cyber classifier, so
+the kickoff the agents see is abstracted; see docs/lab_log.md, 2026-10-23.)
 
 ---
 
