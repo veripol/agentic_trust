@@ -1,9 +1,10 @@
-"""Run the whole SEC-01 sweep: every goal at P0, P1 and P2, every arm, then the digest.
+"""Run a use case's whole sweep: every goal at P0, P1 and P2, every arm, then the digest.
 
 Run on your own machine, with ANTHROPIC_API_KEY and LANGSMITH_API_KEY in .env:
 
-    python -m agentic_trust.runner.sweep --plan     # the plan and its cost estimate; no keys, no spend
-    python -m agentic_trust.runner.sweep            # run it (asks once), then write the digest
+    python -m agentic_trust.runner.sweep --plan          # SEC-01 (the default): plan and cost; no keys, no spend
+    python -m agentic_trust.runner.sweep                 # run SEC-01 (asks once), then write its digest
+    python -m agentic_trust.runner.sweep sec03 --plan    # any use case in agentic_trust.registry, by name
 
 Cells (build spec rules 1-2):
 - one shared P0 cell, both agents on their base prompts, scored by the digest for
@@ -19,11 +20,12 @@ project's $100 total still applies on top. Every model call is checked first aga
 most it could cost, so a stop never overshoots, and the sweep ends cleanly with a PARTIAL
 digest. Rerun with a fresh ``--budget`` to continue.
 
-Resumable: each cell has a fixed directory under runs/sweep/sec01/. A rerun counts the
+Resumable: each cell has a fixed directory under runs/sweep/<use case>/. A rerun counts the
 run files already saved there and continues from the next slot; complete cells are
 skipped. A run interrupted mid-way saved no file and is re-run (its spend up to the
 interruption is already in the ledger). Raw runs stay in runs/ (gitignored); the digest
-is written to docs/results/sec01.md, which git tracks.
+is written to docs/results/<use case>.md, which git tracks. Use cases never share run
+directories or digests.
 """
 
 from __future__ import annotations
@@ -36,15 +38,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from agentic_trust import registry
 from agentic_trust.harness.models import AgentModel, ModelSettings
-from agentic_trust.report import sec01 as report_uc
 from agentic_trust.report.digest import render
 from agentic_trust.report.runs import load_all
 from agentic_trust.runner import cell, preflight, tracing
 from agentic_trust.runner.budget import PROJECT_BUDGET_USD, Ledger
-from agentic_trust.scenarios.security.sec01 import config as sec01
-
-ROOT = Path("runs/sweep/sec01")
+DEFAULT_USE_CASE = "sec01"
+ROOT = Path("runs/sweep/sec01")  # the default use case's paths; others: runs/sweep/<name>
 DIGEST = Path("docs/results/sec01.md")
 LAB_LOG = Path("docs/lab_log.md")
 LEVELS = ("P0", "P1", "P2")
@@ -61,13 +62,26 @@ class CellSpec:
         return f"{self.goal or 'base'}-{self.level}-{self.arm}"
 
 
-def plan() -> list[CellSpec]:
-    """Every cell of the SEC-01 sweep, in run order: the shared P0 cell, then goal by goal."""
-    cells = [CellSpec(None, "P0", "main")]
-    for goal in sec01.GOALS:
-        arms = ["main"] + sorted(a for g, a in sec01.ARMS if g == goal and a != "main")
+def _uc(uc):
+    return uc if uc is not None else registry.get(DEFAULT_USE_CASE)
+
+
+def root_for(name: str) -> Path:
+    return Path("runs/sweep") / name
+
+
+def digest_for(name: str) -> Path:
+    return Path("docs/results") / f"{name}.md"
+
+
+def plan(uc=None) -> list[CellSpec]:
+    """Every cell of a use case's sweep, in run order: the shared P0 cell, then goal by goal."""
+    cfg = _uc(uc).config
+    cells = [CellSpec(None, "P0", "main")] if cfg.SHARED_P0_GOALS else []
+    for goal in cfg.GOALS:
+        arms = ["main"] + sorted(a for g, a in cfg.ARMS if g == goal and a != "main")
         for arm in arms:
-            shared = arm == "main" and goal in sec01.SHARED_P0_GOALS
+            shared = arm == "main" and goal in cfg.SHARED_P0_GOALS
             cells += [CellSpec(goal, lv, arm) for lv in LEVELS if not (lv == "P0" and shared)]
     return cells
 
@@ -98,20 +112,20 @@ def status(spec: CellSpec, root: Path, target: int) -> CellStatus:
     return CellStatus(spec, done, len(saved), target)
 
 
-def estimate_remaining(statuses: list[CellStatus]) -> dict[str, float]:
+def estimate_remaining(statuses: list[CellStatus], uc=None) -> dict[str, float]:
     """Estimated cost of the runs still to do, per run profile (short/typical/long)."""
     totals: dict[str, float] = {}
     for st in statuses:
         if st.remaining:
-            est = cell.cell_estimate(st.spec.goal, st.spec.level, st.spec.arm, st.remaining)
+            est = cell.cell_estimate(st.spec.goal, st.spec.level, st.spec.arm, st.remaining, _uc(uc))
             for name, p in est["profiles"].items():
                 totals[name] = round(totals.get(name, 0.0) + p["cost_cell_usd"], 2)
     return totals
 
 
-def long_run_cost(spec: CellSpec) -> float:
+def long_run_cost(spec: CellSpec, uc=None) -> float:
     """Estimated cost of one long run in this cell: what the sweep reserves before starting a run."""
-    return cell.cell_estimate(spec.goal, spec.level, spec.arm, 1)["profiles"]["long"]["cost_per_run_usd"]
+    return cell.cell_estimate(spec.goal, spec.level, spec.arm, 1, _uc(uc))["profiles"]["long"]["cost_per_run_usd"]
 
 
 @dataclass
@@ -129,6 +143,7 @@ def run_sweep(
     lab_log: Path | None = None,
     limit_usd: float = PROJECT_BUDGET_USD,
     reserve_per_run: float | None = None,
+    uc=None,
 ) -> str:
     """Run every incomplete cell in order. Returns "complete" or "budget_stop".
 
@@ -154,11 +169,11 @@ def run_sweep(
                 f"sweep: {tally.runs} runs, {tally.refused} refused, ${tally.spent:.2f} this sweep, "
                 f"ledger ${ledger.total():.2f} of ${limit_usd:.2f}, cell {i}/{len(todo)}")
 
-        reserve = reserve_per_run if reserve_per_run is not None else long_run_cost(spec)
+        reserve = reserve_per_run if reserve_per_run is not None else long_run_cost(spec, uc)
         summaries = cell.run_cell(spec.goal, spec.level, spec.arm, target, model_factory=model_factory,
                                   ledger=ledger, out_dir=root / spec.name, tags=("sweep", f"sweep-{spec.name}"),
                                   log=lambda _: None, limit_usd=limit_usd, resume=True, on_run=on_run,
-                                  reserve_per_run=reserve)
+                                  reserve_per_run=reserve, uc=_uc(uc))
         stats = cell.cell_stats(summaries, target)
         if lab_log is not None and lab_log.exists():
             with lab_log.open("a") as f:
@@ -171,8 +186,10 @@ def run_sweep(
     return "complete"
 
 
-def write_digest(root: Path, out: Path, cells: list[CellSpec], target: int) -> Path:
-    runs, skipped = load_all(root, "sec01")
+def write_digest(root: Path, out: Path, cells: list[CellSpec], target: int, uc=None) -> Path:
+    uc = _uc(uc)
+    report_uc = uc.report
+    runs, skipped = load_all(root, uc.name)
     statuses = [status(c, root, target) for c in cells]
     done = sum(s.complete for s in statuses)
     banner = "" if done == len(cells) else (
@@ -189,8 +206,8 @@ def spend_limit(spent: float, budget: float | None) -> float:
 
 
 def print_plan(statuses: list[CellStatus], est: dict[str, float], ledger: Ledger, target: int,
-               limit: float = PROJECT_BUDGET_USD) -> None:
-    print(f"SEC-01 sweep: {len(statuses)} cells, target {target} completed runs each "
+               limit: float = PROJECT_BUDGET_USD, name: str = DEFAULT_USE_CASE) -> None:
+    print(f"{name} sweep: {len(statuses)} cells, target {target} completed runs each "
           f"(refused runs re-run, up to {2 * target} attempts a cell)")
     for st in statuses:
         state = "complete" if st.complete else (f"{st.completed}/{target} done" if st.attempts else "to run")
@@ -207,9 +224,11 @@ def print_plan(statuses: list[CellStatus], est: dict[str, float], ledger: Ledger
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("use_case", nargs="?", default=DEFAULT_USE_CASE, choices=sorted(registry.USE_CASES),
+                    help=f"which use case to sweep (default {DEFAULT_USE_CASE})")
     ap.add_argument("--repeats", type=int, default=cell.DEFAULT_REPEATS, help="completed runs per cell")
-    ap.add_argument("--root", type=Path, default=ROOT, help="where run files are saved (gitignored)")
-    ap.add_argument("--digest", type=Path, default=DIGEST, help="where the digest is written (git-tracked)")
+    ap.add_argument("--root", type=Path, help="where run files are saved (default runs/sweep/<use case>, gitignored)")
+    ap.add_argument("--digest", type=Path, help="where the digest is written (default docs/results/<use case>.md)")
     ap.add_argument("--plan", action="store_true", help="print the plan and estimate, then exit; no keys needed")
     ap.add_argument("--report-only", action="store_true", help="write the digest from saved runs, run nothing")
     ap.add_argument("--budget", type=float, metavar="USD",
@@ -218,16 +237,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.budget is not None and args.budget <= 0:
         ap.error("--budget must be more than 0")
 
-    cells = plan()
+    uc = registry.get(args.use_case)
+    args.root = args.root or root_for(uc.name)
+    args.digest = args.digest or digest_for(uc.name)
+    cells = plan(uc)
     ledger = Ledger()
     statuses = [status(c, args.root, args.repeats) for c in cells]
-    est = estimate_remaining(statuses)
+    est = estimate_remaining(statuses, uc)
     limit = spend_limit(ledger.total(), args.budget)
     if args.plan:
-        print_plan(statuses, est, ledger, args.repeats, limit)
+        print_plan(statuses, est, ledger, args.repeats, limit, uc.name)
         return 0
     if args.report_only:
-        print(f"Wrote {write_digest(args.root, args.digest, cells, args.repeats)}")
+        print(f"Wrote {write_digest(args.root, args.digest, cells, args.repeats, uc)}")
         return 0
 
     if not preflight.check():
@@ -239,9 +261,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Not running: missing {', '.join(missing) or 'LANGSMITH_TRACING=true'} (see .env.example).")
         return 1
 
-    print_plan(statuses, est, ledger, args.repeats, limit)
+    print_plan(statuses, est, ledger, args.repeats, limit, uc.name)
     if all(s.complete for s in statuses):
-        print(f"\nEvery cell is complete. Wrote {write_digest(args.root, args.digest, cells, args.repeats)}")
+        print(f"\nEvery cell is complete. Wrote {write_digest(args.root, args.digest, cells, args.repeats, uc)}")
         return 0
     spent = ledger.total()
     if spent >= limit:
@@ -259,12 +281,12 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         outcome = run_sweep(cells, args.repeats, root=args.root, ledger=ledger, model_factory=make_model,
-                            lab_log=LAB_LOG, limit_usd=limit)
+                            lab_log=LAB_LOG, limit_usd=limit, uc=uc)
     except KeyboardInterrupt:
         tracing.flush_quietly()
         print("\nStopped. Every finished run is saved; rerun the same command to resume where it left off.")
         return 130
-    out = write_digest(args.root, args.digest, cells, args.repeats)
+    out = write_digest(args.root, args.digest, cells, args.repeats, uc)
     print(f"\nSweep {outcome}. Ledger total now ${ledger.total():.2f} (this sweep's limit ${limit:.2f}; "
           f"project ceiling ${PROJECT_BUDGET_USD:.0f}). "
           f"Digest: {out} (commit it). Raw runs: {args.root} (gitignored).")

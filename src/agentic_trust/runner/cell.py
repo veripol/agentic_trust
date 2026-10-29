@@ -4,6 +4,7 @@ Run on your own machine, with ANTHROPIC_API_KEY and LANGSMITH_API_KEY in .env:
 
     python -m agentic_trust.runner.cell SEC-DEC-1 P1             # 10 repeats (the default)
     python -m agentic_trust.runner.cell SEC-ES-2 P2 --arm control --repeats 10
+    python -m agentic_trust.runner.cell HLT-NA-2 P1              # any use case: found by goal ID
 
 Before spending, it prints the cell's estimated cost, the project spend so far
 (from the ledger) and what remains of the $100 ceiling. It asks for confirmation
@@ -27,25 +28,29 @@ from agentic_trust.harness.graph import run_episode
 from agentic_trust.harness.models import PRICING, AgentModel, ModelSettings
 from agentic_trust.runner import preflight, tracing
 from agentic_trust.runner.budget import PROJECT_BUDGET_USD, BudgetedModel, BudgetExceeded, Ledger, worst_call_cost
-from agentic_trust.runner.estimate import Profile, estimate
-from agentic_trust.scenarios.security.sec01 import config as sec01
-from agentic_trust.scenarios.security.sec01.prompts import build_prompts
-from agentic_trust.scenarios.security.sec01.scorers import SCORERS
+from agentic_trust.runner.estimate import estimate
+from agentic_trust.scenarios.security.sec01 import config as sec01  # the default use case's config
 
 DEFAULT_REPEATS = 10  # results at 10 runs per cell are reported as directional
 
-# How SEC-01 runs may unfold, for the estimate (runner/estimate.py).
-PROFILES = (
-    Profile("short", rounds=3, calls_per_turn={"researcher": 3, "vendor": 3}, output_per_call=300),
-    Profile("typical", rounds=6, calls_per_turn={"researcher": 3, "vendor": 4}, output_per_call=600),
-    Profile("long", rounds=10, calls_per_turn={"researcher": 4, "vendor": 5}, output_per_call=900),
-)
+
+def _uc(uc):
+    from agentic_trust import registry
+
+    return uc if uc is not None else registry.get("sec01")
 
 
-def cell_estimate(goal: str, level: str, arm: str, repeats: int) -> dict:
-    cfg = sec01.make_config(goal, level, arm)
-    defs = {a: sec01.SCENARIO.agents[a].definitions() for a in cfg.agents}
-    return estimate(build_prompts(cfg), defs, PROFILES, runs=repeats, first_agent="researcher",
+def cell_estimate(goal: str | None, level: str, arm: str, repeats: int, uc=None) -> dict:
+    uc = _uc(uc)
+    cfg = uc.config.make_config(goal, level, arm)
+    defs = {a: uc.config.SCENARIO.agents[a].definitions() for a in cfg.agents}
+    prompts = uc.prompts.build_prompts(cfg)
+    profiles = [p for p in uc.profiles]
+    # Agents not in this run (e.g. a seeded arm that leaves one out) drop out of the estimate.
+    profiles = [type(p)(p.name, p.rounds, {a: n for a, n in p.calls_per_turn.items() if a in cfg.agents},
+                        p.output_per_call, p.history_per_call, p.inbox_per_turn, p.kickoff) for p in profiles]
+    first = uc.first_agent if uc.first_agent in cfg.agents else cfg.agents[0]
+    return estimate(prompts, defs, profiles, runs=repeats, first_agent=first,
                     model=cfg.model, max_run_tokens=cfg.max_run_tokens)
 
 
@@ -86,6 +91,7 @@ def run_cell(
     resume: bool = False,
     on_run: Callable[[dict], None] | None = None,
     reserve_per_run: float = 0.0,
+    uc=None,
 ) -> list[dict]:
     """Run until ``target`` runs finish without a refusal, or ``max_attempts`` (default
     2 x target) attempts are used. A refused run is unscored and re-run under a new run
@@ -99,14 +105,15 @@ def run_cell(
     each run starts: if the ledger total plus that reserve would pass ``limit_usd``, the cell
     stops without starting the run, so no run is cut off half-way by the per-call guard
     (which still backs this up on every call)."""
+    uc = _uc(uc)
     out_dir.mkdir(parents=True, exist_ok=True)
     max_attempts = 2 * target if max_attempts is None else max_attempts
     name = goal or "base"
     summaries: list[dict] = saved_summaries(out_dir) if resume else []
     repeat, attempt = resume_point(summaries) if resume else (0, 0)  # the slot being filled, and its retry number
     while repeat < target and len(summaries) < max_attempts:
-        run_id = f"{sec01.USE_CASE}/{name}/{level}/{arm}/r{repeat:02d}" + (f"/a{attempt}" if attempt else "")
-        cfg = sec01.make_config(goal, level, arm, repeat, tags=tags, run_id=run_id)
+        run_id = f"{uc.config.USE_CASE}/{name}/{level}/{arm}/r{repeat:02d}" + (f"/a{attempt}" if attempt else "")
+        cfg = uc.config.make_config(goal, level, arm, repeat, tags=tags, run_id=run_id)
         model = BudgetedModel(model_factory(ModelSettings(model=cfg.model, effort=cfg.effort)), ledger, cfg.run_id, limit_usd)
         label = f"[{len(summaries) + 1}, slot {repeat + 1}/{target}]"
         spent = ledger.total()
@@ -126,7 +133,7 @@ def run_cell(
             break
         started = time.monotonic()
         try:
-            result = run_episode(cfg, sec01.SCENARIO, build_prompts(cfg), model)
+            result = run_episode(cfg, uc.config.SCENARIO, uc.prompts.build_prompts(cfg), model)
         except BudgetExceeded as exc:
             log(f"{label} {cfg.run_id}: STOPPED by the budget guard: {exc}")
             stop = {"run_id": cfg.run_id, "repeat": repeat, "attempt": attempt,
@@ -135,7 +142,7 @@ def run_cell(
             if on_run:
                 on_run(stop)
             break
-        verdict = SCORERS[goal](result.outputs()) if goal else _SHARED
+        verdict = uc.scorers.SCORERS[goal](result.outputs()) if goal else _SHARED
         refusals = result.world["truth"].get("refusals", [])
         summary = {
             "run_id": cfg.run_id,
@@ -231,8 +238,11 @@ def _trace_links(tag: str) -> list[str]:
 
 
 def main(argv: list[str] | None = None, *, always_confirm: bool = False, label: str = "cell") -> int:
+    from agentic_trust import registry
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("goal", choices=sorted(sec01.GOALS))
+    all_goals = sorted(g for u in registry.available().values() for g in u.config.GOALS)
+    ap.add_argument("goal", choices=all_goals)
     ap.add_argument("level", choices=["P0", "P1", "P2"])
     ap.add_argument("--arm", default="main")
     ap.add_argument("--repeats", type=int, default=DEFAULT_REPEATS,
@@ -250,10 +260,11 @@ def main(argv: list[str] | None = None, *, always_confirm: bool = False, label: 
         print(f"Not running: missing {', '.join(missing) or 'LANGSMITH_TRACING=true'} (see .env.example).")
         return 1
 
+    uc = registry.use_case_of(args.goal)
     ledger = Ledger()
-    est = cell_estimate(args.goal, args.level, args.arm, args.repeats)
+    est = cell_estimate(args.goal, args.level, args.arm, args.repeats, uc)
     spent, high, crosses = budget_check(est, ledger)
-    cfg = sec01.make_config(args.goal, args.level, args.arm)
+    cfg = uc.config.make_config(args.goal, args.level, args.arm)
     print(f"\n{label}: {args.goal} {args.level} arm={args.arm}, {args.repeats} run(s), {cfg.model} effort={cfg.effort}")
     for name, p in est["profiles"].items():
         print(f"  estimate if runs are {name:<8}: ${p['cost_cell_usd']:.2f} (${p['cost_per_run_usd']:.3f}/run"
@@ -279,7 +290,7 @@ def main(argv: list[str] | None = None, *, always_confirm: bool = False, label: 
     tag = f"{label}-{stamp}"
     out = args.out / label / f"{args.goal}-{args.level}-{args.arm}" / stamp
     summaries = run_cell(args.goal, args.level, args.arm, args.repeats, model_factory=make_model,
-                         ledger=ledger, out_dir=out, tags=(label, tag))
+                         ledger=ledger, out_dir=out, tags=(label, tag), uc=uc)
     tracing.flush()
 
     stats = cell_stats(summaries, args.repeats)

@@ -10,11 +10,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import sec01
+from agentic_trust import registry
+
 from .digest import render
 from .runs import load_all
 
-USE_CASES = {"sec01": sec01}
+USE_CASES = registry.USE_CASES
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -25,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--sample", action="store_true", help="a format preview: marked as such, saved as _sample_")
     args = ap.parse_args(argv)
 
-    uc = USE_CASES[args.use_case]
+    uc = registry.get(args.use_case).report
     runs, skipped = load_all(args.runs, args.use_case)
     if not runs:
         print(f"No usable {args.use_case} run files under {args.runs}.")

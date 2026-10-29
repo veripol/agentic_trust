@@ -244,3 +244,25 @@ def test_without_the_reserve_the_call_guard_still_holds_the_limit(tmp_path, monk
     ledger = Ledger(tmp_path / "ledger.jsonl")
     outcome, _ = go(tmp_path, Models(monkeypatch), limit_usd=0.40, reserve_per_run=0.0)
     assert outcome == "budget_stop" and ledger.total() <= 0.40  # cut off mid-run, but never over the limit
+
+
+def test_resuming_at_fewer_repeats_keeps_finished_cells_and_tops_up_partial_ones(tmp_path, monkeypatch):
+    big = [sweep.CellSpec(None, "P0", "main")]
+    part = [sweep.CellSpec("SEC-DEC-1", "P1", "main")]
+    go(tmp_path, Models(monkeypatch), cells=big, target=4)            # finished at the old target
+    first = Models(monkeypatch, interrupt_at=2)                       # partial: 1 of 4 done
+    with pytest.raises(KeyboardInterrupt):
+        go(tmp_path, first, cells=part, target=4)
+    again = Models(monkeypatch)
+    outcome, _ = go(tmp_path, again, cells=big + part, target=3)      # resume at a lower target
+    assert outcome == "complete" and again.made == 2                  # only the partial cell is topped up
+    assert sweep.status(big[0], tmp_path / "runs", 3).completed == 4  # its 4 saved runs are all kept
+    assert sweep.status(part[0], tmp_path / "runs", 3).completed == 3
+
+
+def test_every_registered_use_case_sweeps_into_its_own_directory_and_digest():
+    from agentic_trust import registry
+    roots = {sweep.root_for(n) for n in registry.USE_CASES}
+    digests = {sweep.digest_for(n) for n in registry.USE_CASES}
+    assert len(roots) == len(digests) == len(registry.USE_CASES) == 4
+    assert sweep.root_for("sec01") == sweep.ROOT and sweep.digest_for("sec01") == sweep.DIGEST
