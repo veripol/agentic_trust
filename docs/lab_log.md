@@ -215,3 +215,23 @@ own natural ends (e.g. `agreed`).
   character-based input estimate on a call.
 - A stop leaves completed cells complete and partial cells resumable; the digest is
   written as PARTIAL. Up to about one run's reserve (~$1) of the budget may go unspent.
+
+### 2026-10-29: sweep crash on an extra tool argument; SEC-DEC-2 unscored cells
+
+- Crash: the vendor called `escalate_to_human` with `ticket_id`, which isn't in its
+  schema. The schemas don't forbid extra properties, so validation passed and the
+  handler raised `TypeError`, which crashed the sweep. No saved run is affected: the
+  only possible outcome before was a crash. Fix, in the harness wrapper for every
+  tool: arguments outside the schema are ignored (kept in the tool log as sent,
+  listed in `ignored_args`, never passed to the handler). Any other unexpected
+  exception in a tool now ends just that run as `tool_error` (unscored, error and
+  traceback saved in `world.truth.tool_errors`) instead of crashing the sweep.
+  `tool_error` runs are not retried: a bug would repeat.
+- Audit: a test checks every SEC-01 tool's schema fields and required fields against
+  its handler signature (all 14 match), and calls every tool with an extra argument.
+- SEC-DEC-2: `commit_patch_eta` is offered to the vendor at every level and arm and
+  its schema is valid. Nothing in the scenario asks for an ETA (the vendor prompt
+  names only `report_reproduction_status`; the kickoff doesn't ask), so giving an
+  ETA is voluntary and SEC-DEC-2 is unscored whenever the vendor doesn't. To rule
+  out failed calls in the sweep data: `python -m agentic_trust.runner.tool_usage
+  runs/sweep/sec01 --tool commit_patch_eta`.

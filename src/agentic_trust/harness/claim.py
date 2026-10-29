@@ -189,15 +189,20 @@ def execute_tool(
     scripted: bool = False,
 ) -> ToolOutcome:
     """Run one tool call through the wrapper. See the module docstring."""
-    args = copy.deepcopy(dict(args))
+    sent = copy.deepcopy(dict(args))
     validator = jsonschema.Draft202012Validator(dict(spec.input_schema))
-    errors = sorted(validator.iter_errors(args), key=lambda e: list(e.path))
+    errors = sorted(validator.iter_errors(sent), key=lambda e: list(e.path))
     if errors:
         message = "; ".join(_describe(e) for e in errors)
         outcome = ToolOutcome({"error": f"invalid arguments: {message}"}, True)
-        _record(state, agent, spec.name, args, outcome, scripted)
+        _record(state, agent, spec.name, sent, outcome, scripted)
         return outcome
 
+    # Arguments the schema does not define (e.g. a ticket_id on escalate_to_human) are
+    # ignored: kept in the tool log as sent, never passed to the handler.
+    known = set(spec.input_schema.get("properties", {}))
+    ignored = sorted(k for k in sent if k not in known)
+    args = {k: v for k, v in sent.items() if k in known}
     public_args = {k: v for k, v in args.items() if k not in spec.internal_fields}
     ctx = ToolContext(state, agent, spec.name, args, public_args, scripted)
     try:
@@ -205,6 +210,10 @@ def execute_tool(
         outcome = ToolOutcome(result, False)
     except ToolError as exc:
         outcome = ToolOutcome({"error": str(exc)}, True)
+    except Exception as exc:  # a bug in a tool, not the agent's doing: record it and end the run
+        outcome = ToolOutcome({"error": f"internal tool error in {spec.name}"}, True)
+        _record(state, agent, spec.name, sent, outcome, scripted, ignored)
+        raise ToolCrash(spec.name, exc) from exc
 
     if not outcome.is_error:
         logger = ClaimLogger(state.world)
@@ -220,15 +229,26 @@ def execute_tool(
                     scripted=scripted,
                     call_seq=len(state.tool_log) + 1,  # the record _record is about to append
                 )
-    _record(state, agent, spec.name, args, outcome, scripted)
+    _record(state, agent, spec.name, sent, outcome, scripted, ignored)
     return outcome
+
+
+class ToolCrash(RuntimeError):
+    """A tool handler raised something other than ToolError: a bug. The harness ends the
+    run as ``tool_error`` (unscored) and saves the details instead of crashing the sweep."""
+
+    def __init__(self, tool: str, exc: BaseException) -> None:
+        super().__init__(f"{tool}: {type(exc).__name__}: {exc}")
+        self.tool = tool
+        self.exc = exc
 
 
 class ToolError(Exception):
     """Raise from a handler to return an error result to the agent (e.g. unknown ticket id)."""
 
 
-def _record(state: RunState, agent: str, tool: str, args: dict, outcome: ToolOutcome, scripted: bool) -> None:
+def _record(state: RunState, agent: str, tool: str, args: dict, outcome: ToolOutcome, scripted: bool,
+            ignored: list[str] | None = None) -> None:
     state.tool_log.append(
         ToolCallRecord(
             seq=len(state.tool_log) + 1,
@@ -240,6 +260,7 @@ def _record(state: RunState, agent: str, tool: str, args: dict, outcome: ToolOut
             result=copy.deepcopy(outcome.result),
             is_error=outcome.is_error,
             scripted=scripted,
+            ignored_args=list(ignored or []),
         )
     )
 

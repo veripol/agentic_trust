@@ -19,13 +19,14 @@ real tool, so it has exactly the effects (and wire message) the real call would.
 from __future__ import annotations
 
 import json
+import traceback
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, Mapping, Protocol, TypedDict
 
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 
-from .claim import ToolSpec
+from .claim import ToolCrash, ToolSpec
 from .models import AgentModel, Usage
 from .state import RunConfig, RunState, World
 from .tracing import traced_complete, traced_run, traced_tool
@@ -41,6 +42,7 @@ END_REASONS = {
     "recursion_limit": "LangGraph's recursion limit (one superstep per agent turn) was hit",
     "token_cap": "the per-run token backstop (max_run_tokens) was hit",
     "refusal": "the model declined a request (stop_reason 'refusal')",
+    "tool_error": "a tool raised an unexpected error (a bug); details in world truth tool_errors",
     "max_tokens": "a model response hit max_tokens",
     "router_end": "the scenario router ended the run",
     "completed": "the graph finished without any other reason being set",
@@ -49,7 +51,7 @@ END_REASONS = {
 # A run that ends this way says nothing about the criterion: a model declining, or
 # a runaway run stopped by the token backstop, is not the agent failing it.
 # Scorers must return unscored, never fail.
-UNSCORED_END_REASONS = frozenset({"refusal", "token_cap"})
+UNSCORED_END_REASONS = frozenset({"refusal", "token_cap", "tool_error"})
 
 
 # --------------------------------------------------------------------------- scenario shape
@@ -373,16 +375,25 @@ class _Episode:
         if tool is None:
             result, is_error = {"error": f"unknown tool {use['name']!r}"}, True
         else:
-            outcome = traced_tool(self.state, agent, tool, use.get("input") or {})
-            result, is_error = outcome.result, outcome.is_error
-            if not is_error:
-                args = use.get("input") or {}
-                self._fire(
-                    lambda p: p.when == "after_tool"
-                    and p.agent == agent
-                    and p.tool == tool.name
-                    and all(args.get(k) == v for k, v in p.match.items())
-                )
+            try:
+                outcome = traced_tool(self.state, agent, tool, use.get("input") or {})
+                result, is_error = outcome.result, outcome.is_error
+                if not is_error:
+                    args = use.get("input") or {}
+                    self._fire(
+                        lambda p: p.when == "after_tool"
+                        and p.agent == agent
+                        and p.tool == tool.name
+                        and all(args.get(k) == v for k, v in p.match.items())
+                    )
+            except ToolCrash as crash:
+                self.state.world.setdefault("tool_errors", []).append({
+                    "agent": agent, "tool": crash.tool, "round": self.state.round, "args": use.get("input"),
+                    "error": f"{type(crash.exc).__name__}: {crash.exc}",
+                    "traceback": "".join(traceback.format_exception(crash.exc)),
+                })
+                self.state.end("tool_error")
+                result, is_error = {"error": f"internal tool error in {crash.tool}"}, True
         block = {
             "type": "tool_result",
             "tool_use_id": use["id"],

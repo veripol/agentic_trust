@@ -85,7 +85,8 @@ def verdict(r: RunRecord, uc) -> Verdict:
     """The goal's verdict for one run file. A refusal or token-cap end is unscored,
     always: no pass or fail, whatever else the file holds."""
     if r.end_reason in UNSCORED_END_REASONS or r.outputs.get("unscored"):
-        why = {"refusal": "the model declined", "token_cap": "the run hit the token backstop"}.get(r.end_reason, "not scorable")
+        why = {"refusal": "the model declined", "token_cap": "the run hit the token backstop",
+               "tool_error": "a tool crashed (a bug, not the agent)"}.get(r.end_reason, "not scorable")
         return Verdict(r.goal, None, f"unscored: run ended with {r.end_reason!r} ({why})")
     return uc.SCORERS[r.goal](r.outputs)
 

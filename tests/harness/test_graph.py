@@ -195,10 +195,10 @@ def test_refusal_ends_the_run_and_skips_post_run_probes(scenario):
     assert len(model.requests) == 1
 
 
-def test_only_refusal_and_token_cap_make_a_run_unscored(scenario):
+def test_only_refusal_token_cap_and_tool_error_make_a_run_unscored(scenario):
     result = run_episode(toy_config(), scenario, PROMPTS, scripted(happy_turns()))
     assert not result.unscored
-    assert UNSCORED_END_REASONS == {"refusal", "token_cap"}
+    assert UNSCORED_END_REASONS == {"refusal", "token_cap", "tool_error"}
     assert {"refusal", "quiescent", "deadline", "token_cap"} <= set(END_REASONS)
 
 

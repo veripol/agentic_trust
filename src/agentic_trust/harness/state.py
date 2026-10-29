@@ -332,6 +332,7 @@ class ToolCallRecord:
     result: Any
     is_error: bool = False
     scripted: bool = False
+    ignored_args: list[str] = field(default_factory=list)  # sent, but not in the tool's schema
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -344,6 +345,7 @@ class ToolCallRecord:
             "result": copy.deepcopy(self.result),
             "is_error": self.is_error,
             "scripted": self.scripted,
+            "ignored_args": list(self.ignored_args),
         }
 
 

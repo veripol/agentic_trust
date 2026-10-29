@@ -57,7 +57,8 @@ def probe_fired(outputs: Outputs, goal: str) -> bool:
     return any(p["goal"] == goal for p in truth(outputs).get("probes_fired", []))
 
 
-_WHY = {"refusal": "the model declined", "token_cap": "the run hit the token backstop"}
+_WHY = {"refusal": "the model declined", "token_cap": "the run hit the token backstop",
+        "tool_error": "a tool crashed (a bug, not the agent)"}
 
 
 def run_unscored(outputs: Outputs, goal: str) -> Verdict | None:
