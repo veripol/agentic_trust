@@ -266,3 +266,19 @@ def test_every_registered_use_case_sweeps_into_its_own_directory_and_digest():
     digests = {sweep.digest_for(n) for n in registry.USE_CASES}
     assert len(roots) == len(digests) == len(registry.USE_CASES) == 4
     assert sweep.root_for("sec01") == sweep.ROOT and sweep.digest_for("sec01") == sweep.DIGEST
+
+
+def test_goals_filter_keeps_only_those_cells_and_the_shared_p0_when_needed():
+    cells = sweep.plan(goals=["SEC-DEC-1", "SEC-BA-4"])
+    assert [c.name for c in cells] == ["base-P0-main", "SEC-DEC-1-P1-main", "SEC-DEC-1-P2-main",
+                                       "SEC-BA-4-P0-main", "SEC-BA-4-P1-main", "SEC-BA-4-P2-main"]
+    assert [c.name for c in sweep.plan(goals=["SEC-BA-3"])][0] == "SEC-BA-3-P0-main"  # no shared cell needed
+    with pytest.raises(ValueError, match="HLT-NA-2"):
+        sweep.plan(goals=["HLT-NA-2"])
+
+
+def test_cli_plan_with_goals(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert sweep.main(["health02", "--plan", "--goals", "HLT-NA-2,HLT-ES-2", "--repeats", "6"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("health02 sweep:") and "HLT-REC-3" not in out and "HLT-NA-2-P1-main" in out

@@ -74,11 +74,18 @@ def digest_for(name: str) -> Path:
     return Path("docs/results") / f"{name}.md"
 
 
-def plan(uc=None) -> list[CellSpec]:
-    """Every cell of a use case's sweep, in run order: the shared P0 cell, then goal by goal."""
+def plan(uc=None, goals: list[str] | None = None) -> list[CellSpec]:
+    """Every cell of a use case's sweep, in run order: the shared P0 cell, then goal by goal.
+    ``goals`` keeps only those goals' cells (and the shared P0 cell if any of them use it)."""
     cfg = _uc(uc).config
-    cells = [CellSpec(None, "P0", "main")] if cfg.SHARED_P0_GOALS else []
-    for goal in cfg.GOALS:
+    if goals is not None:
+        unknown = set(goals) - set(cfg.GOALS)
+        if unknown:
+            raise ValueError(f"not goals of {cfg.USE_CASE}: {sorted(unknown)}")
+    wanted = [g for g in cfg.GOALS if goals is None or g in goals]
+    shared_needed = any(g in cfg.SHARED_P0_GOALS for g in wanted)
+    cells = [CellSpec(None, "P0", "main")] if shared_needed else []
+    for goal in wanted:
         arms = ["main"] + sorted(a for g, a in cfg.ARMS if g == goal and a != "main")
         for arm in arms:
             shared = arm == "main" and goal in cfg.SHARED_P0_GOALS
@@ -231,6 +238,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--digest", type=Path, help="where the digest is written (default docs/results/<use case>.md)")
     ap.add_argument("--plan", action="store_true", help="print the plan and estimate, then exit; no keys needed")
     ap.add_argument("--report-only", action="store_true", help="write the digest from saved runs, run nothing")
+    ap.add_argument("--goals", help="comma-separated goal IDs to run (default: every goal); "
+                                     "the same cell directories are used, so other goals can run later")
     ap.add_argument("--budget", type=float, metavar="USD",
                     help=f"most this invocation may spend (default: up to the ${PROJECT_BUDGET_USD:.0f} project ceiling)")
     args = ap.parse_args(argv)
@@ -240,7 +249,11 @@ def main(argv: list[str] | None = None) -> int:
     uc = registry.get(args.use_case)
     args.root = args.root or root_for(uc.name)
     args.digest = args.digest or digest_for(uc.name)
-    cells = plan(uc)
+    goals = [g.strip() for g in args.goals.split(",")] if args.goals else None
+    try:
+        cells = plan(uc, goals)
+    except ValueError as exc:
+        ap.error(str(exc))
     ledger = Ledger()
     statuses = [status(c, args.root, args.repeats) for c in cells]
     est = estimate_remaining(statuses, uc)

@@ -235,3 +235,22 @@ own natural ends (e.g. `agreed`).
   ETA is voluntary and SEC-DEC-2 is unscored whenever the vendor doesn't. To rule
   out failed calls in the sweep data: `python -m agentic_trust.runner.tool_usage
   runs/sweep/sec01 --tool commit_patch_eta`.
+
+### 2026-10-29: SEC-03, HEALTH-01 and HEALTH-02 built (no live runs)
+
+- Use-case registry (`src/agentic_trust/registry.py`). The cell runner, sweep and
+  report work by name: `python -m agentic_trust.runner.sweep <sec01|sec03|health01|health02>`.
+  With no name, the sweep runs SEC-01, with SEC-01's directories unchanged. Each
+  use case has its own `runs/sweep/<name>/` and `docs/results/<name>.md`.
+- Base-layer docs `docs/base/{sec03,health01,health02}.md`. Every value not in the
+  docs is marked PROPOSED, with open questions at the end of each. The scenarios
+  are built on those proposals and need confirmation before results are reported.
+- Departures recorded in the builds: HEALTH-02 runs SNF-A and SNF-B as two agents
+  with the same prompt (the spec says one agent "in turn"); SEC-03 gives Org A its
+  own bundle (`meridian-i1`) so its sanitise and submit tools work; SEC-BA-2 runs
+  without Org B (the seeded arm). Full lists are in the build notes.
+- `--goals` restricts a sweep to named goals (same cell directories, so the rest can
+  run later).
+- Cost at 6 repeats, typical estimate: SEC-01 $47, SEC-03 $52, HEALTH-01 $20,
+  HEALTH-02 $75: $194 in all, nearly twice the $100 ceiling. The build spec's headline
+  goals at 6 repeats: SEC-LD-1 + SEC-DEC-3 $17, HLT-NA-2 + HLT-ES-2 $31.
