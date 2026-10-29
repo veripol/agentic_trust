@@ -142,7 +142,7 @@ def test_the_ceiling_stops_the_sweep_and_the_digest_says_partial(tmp_path, monke
     ledger.record(run_id="earlier", model="m", usage={}, cost_usd=99.80)
     outcome, lines = go(tmp_path, Models(monkeypatch))
     assert outcome == "budget_stop" and ledger.total() <= 100.0
-    assert any("Stopped at the $100 ceiling" in l for l in lines)
+    assert any("Stopped at the $100.00 spend limit" in l for l in lines)
     out = sweep.write_digest(tmp_path / "runs", tmp_path / "docs" / "results" / "sec01.md", SMALL, 2)
     assert "> PARTIAL: 0 of 3 cells complete." in out.read_text()
 
@@ -196,3 +196,51 @@ def test_resume_after_a_refusal_keeps_the_refused_file_and_retries_that_slot(tmp
     assert runs["sec01/SEC-DEC-1/P1/main/r00"]["summary"]["end_reason"] == "refusal"  # not overwritten
     stats = json.loads((tmp_path / "runs" / cells[0].name / "cell.json").read_text())
     assert (stats["attempts"], stats["refused"], stats["completed"]) == (3, 1, 2)
+
+
+# --------------------------------------------------------------------------- --budget
+
+
+def test_spend_limit_is_spent_plus_budget_within_the_project_ceiling():
+    assert sweep.spend_limit(3.0, 20) == 23.0
+    assert sweep.spend_limit(95.0, 20) == 100.0  # the project ceiling still holds
+    assert sweep.spend_limit(3.0, None) == 100.0
+
+
+def test_a_budget_stops_the_sweep_without_overshooting_and_a_rerun_finishes_without_repaying(tmp_path, monkeypatch):
+    ledger = Ledger(tmp_path / "ledger.jsonl")
+    ledger.record(run_id="smoke", model="m", usage={}, cost_usd=1.00)
+    # Each scripted run costs about $0.08. The reserve before each run is raised to twice the
+    # per-call guard's worst case (~$0.33), so runs 1-4 start and run 5 does not.
+    budget = 0.60
+    outcome, lines = go(tmp_path, Models(monkeypatch), limit_usd=sweep.spend_limit(ledger.total(), budget),
+                        reserve_per_run=0.10)
+    new_spend = ledger.total() - 1.00
+    assert outcome == "budget_stop" and 0 < new_spend <= budget
+    assert any("Stopped at the $1.60 spend limit" in l for l in lines)
+    assert not any("budget guard" in l for l in lines)  # stopped between runs, not by refusing a call mid-run
+    done_before = {c.name for c in SMALL if sweep.status(c, tmp_path / "runs", 2).complete}
+    files_before = set(saved(tmp_path))
+    assert done_before and len(done_before) < len(SMALL)  # some cells finished, not all
+
+    again = Models(monkeypatch)
+    outcome, _ = go(tmp_path, again, limit_usd=sweep.spend_limit(ledger.total(), 20), reserve_per_run=0.10)
+    assert outcome == "complete" and files_before <= set(saved(tmp_path)) and len(saved(tmp_path)) == 6
+    assert again.made == 6 - len(files_before)  # only the runs not already saved were paid for
+    costs = sum(json.loads((tmp_path / p).read_text())["summary"]["cost_usd"] for p in saved(tmp_path))
+    assert ledger.total() == pytest.approx(1.00 + costs)  # every paid call belongs to a saved run: nothing paid twice
+
+
+def test_plan_shows_the_budget_limit(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    Ledger().record(run_id="smoke", model="m", usage={}, cost_usd=1.25)
+    assert sweep.main(["--plan", "--budget", "20"]) == 0
+    assert "This sweep stops at a ledger total of $21.25: up to $20.00 new spend." in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        sweep.main(["--plan", "--budget", "0"])
+
+
+def test_without_the_reserve_the_call_guard_still_holds_the_limit(tmp_path, monkeypatch):
+    ledger = Ledger(tmp_path / "ledger.jsonl")
+    outcome, _ = go(tmp_path, Models(monkeypatch), limit_usd=0.40, reserve_per_run=0.0)
+    assert outcome == "budget_stop" and ledger.total() <= 0.40  # cut off mid-run, but never over the limit

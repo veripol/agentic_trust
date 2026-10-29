@@ -26,7 +26,7 @@ from typing import Callable
 from agentic_trust.harness.graph import run_episode
 from agentic_trust.harness.models import PRICING, AgentModel, ModelSettings
 from agentic_trust.runner import preflight, tracing
-from agentic_trust.runner.budget import PROJECT_BUDGET_USD, BudgetedModel, BudgetExceeded, Ledger
+from agentic_trust.runner.budget import PROJECT_BUDGET_USD, BudgetedModel, BudgetExceeded, Ledger, worst_call_cost
 from agentic_trust.runner.estimate import Profile, estimate
 from agentic_trust.scenarios.security.sec01 import config as sec01
 from agentic_trust.scenarios.security.sec01.prompts import build_prompts
@@ -85,6 +85,7 @@ def run_cell(
     max_attempts: int | None = None,
     resume: bool = False,
     on_run: Callable[[dict], None] | None = None,
+    reserve_per_run: float = 0.0,
 ) -> list[dict]:
     """Run until ``target`` runs finish without a refusal, or ``max_attempts`` (default
     2 x target) attempts are used. A refused run is unscored and re-run under a new run
@@ -94,7 +95,10 @@ def run_cell(
     ``goal=None`` is the shared P0 cell: base prompts for both agents, scored per goal in
     the digest (build spec rule 2). ``resume=True`` continues from the runs already saved
     in ``out_dir`` instead of starting over; those count toward the target and the cap.
-    ``on_run`` is called with each new run's summary."""
+    ``on_run`` is called with each new run's summary. ``reserve_per_run`` is checked before
+    each run starts: if the ledger total plus that reserve would pass ``limit_usd``, the cell
+    stops without starting the run, so no run is cut off half-way by the per-call guard
+    (which still backs this up on every call)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     max_attempts = 2 * target if max_attempts is None else max_attempts
     name = goal or "base"
@@ -105,6 +109,21 @@ def run_cell(
         cfg = sec01.make_config(goal, level, arm, repeat, tags=tags, run_id=run_id)
         model = BudgetedModel(model_factory(ModelSettings(model=cfg.model, effort=cfg.effort)), ledger, cfg.run_id, limit_usd)
         label = f"[{len(summaries) + 1}, slot {repeat + 1}/{target}]"
+        spent = ledger.total()
+        if reserve_per_run:
+            # Never reserve less than the per-call guard holds back for a call or two, or a
+            # run that started could still be cut off by the guard half-way through.
+            settings = ModelSettings(model=cfg.model, effort=cfg.effort)
+            reserve_per_run = max(reserve_per_run, 2 * worst_call_cost(cfg.model, settings.max_tokens, "", [], []))
+        if reserve_per_run and spent + reserve_per_run > limit_usd:
+            msg = (f"not starting {cfg.run_id}: ${spent:.2f} spent + ${reserve_per_run:.2f} reserved for one run "
+                   f"would pass the ${limit_usd:.2f} limit")
+            log(f"{label} STOPPED: {msg}")
+            stop = {"run_id": cfg.run_id, "repeat": repeat, "attempt": attempt, "end_reason": "budget_stop", "error": msg}
+            summaries.append(stop)
+            if on_run:
+                on_run(stop)
+            break
         started = time.monotonic()
         try:
             result = run_episode(cfg, sec01.SCENARIO, build_prompts(cfg), model)

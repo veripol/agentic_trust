@@ -202,3 +202,16 @@ own natural ends (e.g. `agreed`).
   runs are short, $78.36 typical, $244.19 long. Only the short and typical cases fit
   under the $100 ceiling. The smoke run's actual cost per run is the best calibration
   available.
+
+### 2026-10-29: per-invocation sweep budget
+
+- `python -m agentic_trust.runner.sweep --budget 20`: this invocation may spend at
+  most $20 (limit = ledger total at start + $20, never above the $100 ceiling).
+- Two checks. (1) Before each run starts, the sweep reserves that cell's estimated
+  long-run cost (at least twice the worst single call) and stops cleanly if it
+  doesn't fit. No run is cut off half-way, so every paid call belongs to a saved
+  run. (2) The per-call guard still checks each call against the most it could
+  cost. The only way past the limit is the API billing more than 1.5x the
+  character-based input estimate on a call.
+- A stop leaves completed cells complete and partial cells resumable; the digest is
+  written as PARTIAL. Up to about one run's reserve (~$1) of the budget may go unspent.

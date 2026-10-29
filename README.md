@@ -68,7 +68,15 @@ spend after a fresh checkout.
 ```bash
 python -m agentic_trust.runner.sweep --plan   # cells, runs to go, cost estimate; no keys, no spend
 python -m agentic_trust.runner.sweep          # run it: asks once, then writes the digest
+python -m agentic_trust.runner.sweep --budget 20   # this invocation spends at most $20
 ```
+
+`--budget USD` caps what one invocation spends. The $100 project ceiling still
+applies on top. Before each run, the sweep reserves the estimated cost of a long
+run for that cell and stops cleanly if it would not fit. Every model call is also
+checked first against the most it could cost. A stop therefore never overshoots
+and never leaves a run half-paid. A PARTIAL digest is written; rerun with a new
+`--budget` to continue.
 
 The SEC-01 sweep runs 25 cells: one shared P0 cell, then goal by goal. The shared
 cell scores every goal that has no probe or arm change. Probe goals and control
