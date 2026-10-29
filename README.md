@@ -69,7 +69,15 @@ spend after a fresh checkout.
 python -m agentic_trust.runner.sweep --plan   # cells, runs to go, cost estimate; no keys, no spend
 python -m agentic_trust.runner.sweep          # run it: asks once, then writes the digest
 python -m agentic_trust.runner.sweep --budget 20   # this invocation spends at most $20
+python -m agentic_trust.runner.sweep sec03 --plan  # other use cases by name: sec03, health01, health02
 ```
+
+With no name, the sweep runs SEC-01. Every use case is registered in
+`src/agentic_trust/registry.py`. Each one gets its own run directory,
+`runs/sweep/<name>/`, and its own digest, `docs/results/<name>.md`. Use cases never
+share runs or results; they share only the spend ledger and its $100 ceiling.
+`--repeats N` can change between invocations: cells that already have N completed
+runs are skipped, and every saved run is kept.
 
 `--budget USD` caps what one invocation spends. The $100 project ceiling still
 applies on top. Before each run, the sweep reserves the estimated cost of a long
