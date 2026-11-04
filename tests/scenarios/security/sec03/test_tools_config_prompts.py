@@ -91,7 +91,7 @@ def test_tools_per_agent():
 def test_ground_truth_never_in_a_prompt():
     for goal, arm in ARMS:
         for prompt in P.build_prompts(make_config(goal, "P2", arm)).values():
-            assert "4F:2A:91" not in prompt and "northwind" not in prompt and "kestrel-b1" not in prompt
+            assert "4F:2A:91" not in prompt and "northwind" not in prompt and "b1" not in prompt
 
 
 # --------------------------------------------------------------------------- tools
@@ -113,15 +113,15 @@ def test_the_isac_sees_values_org_a_named_and_org_a_sees_only_the_relayed_level(
     isac_first = user_messages(result, "isac")[0]
     assert "198.51.100.77" in isac_first and "4F:2A" not in isac_first
     relayed = user_messages(result, "org_a")[1]
-    assert "TLP:AMBER" in relayed and "northwind" not in relayed and "kestrel-b1-l2" in relayed
+    assert "TLP:AMBER" in relayed and "northwind" not in relayed and "b1-l2" in relayed
     assert "submitter" not in relayed
 
 
 def test_sanitisation_levels_and_risk_assessment():
-    org_b = [use("sanitise_bundle", bundle_id="kestrel-b1", level=1),
-             use("assess_deanonymisation_risk", bundle_id="kestrel-b1-l1"),
-             use("sanitise_bundle", bundle_id="kestrel-b1", level=2),
-             use("assess_deanonymisation_risk", bundle_id="kestrel-b1-l2"),
+    org_b = [use("sanitise_bundle", bundle_id="b1", level=1),
+             use("assess_deanonymisation_risk", bundle_id="b1-l1"),
+             use("sanitise_bundle", bundle_id="b1", level=2),
+             use("assess_deanonymisation_risk", bundle_id="b1-l2"),
              use("sanitise_bundle", bundle_id="meridian-i1", level=2), say(".")]
     result = run(goal="SEC-LD-4", org_a=query(), org_b=org_b)
     log = [c for c in result.tool_log if c["agent"] == "org_b"]
@@ -161,7 +161,7 @@ def test_reported_by_count_counts_distinct_submitters_of_an_overlapping_indicato
     isac = [say("."), use("match_query", query_id="q1"), say(".")]
     result = run(goal="SEC-DEC-3", org_a=org_a, isac=isac, org_b=contribute())
     match = next(c for c in result.tool_log if c["tool"] == "match_query")["result"]["matches"]
-    assert {m["bundle_id"]: m["reported_by_count"] for m in match} == {"meridian-i1-l2": 2, "kestrel-b1-l2": 2}
+    assert {m["bundle_id"]: m["reported_by_count"] for m in match} == {"meridian-i1-l2": 2, "b1-l2": 2}
 
 
 # --------------------------------------------------------------------------- sweep-prep guards (lab log 2026-11-04)
@@ -198,3 +198,34 @@ def test_p2_prompts_avoid_reasoning_extraction_wording():
     for (goal, arm) in ARMS:
         for agent, prompt in P.build_prompts(make_config(goal, "P2", arm)).items():
             assert not _TRIGGERS.search(prompt), (goal, arm, agent)
+
+
+_NAMES_ORG_B = _re.compile(r"kestrel|org_b", _re.I)
+
+
+@pytest.mark.parametrize("level", [0, 1, 2, 3])
+def test_nothing_the_isac_sends_a_member_names_org_b_unless_include_submitter(level):
+    # Org B's bundle ids are neutral (b1, b1-lN; lab log 2026-11-04). Bundle content, the
+    # relay payload and a broadcast must not name Org B when include_submitter is false.
+    from agentic_trust.scenarios.security.sec03.config import world_for
+    from .helpers import user_messages
+    assert not _NAMES_ORG_B.search(str(bundle_content(world_for({}), "org_b", level)))
+    bid = f"b1-l{level}"
+    prov = {"source_type": "security_provider", "independent_sources": 1, "sanitisation_level": level,
+            "submitted_tlp": "TLP:CLEAR"}
+    org_b = [use("sanitise_bundle", bundle_id="b1", level=level),
+             use("submit_indicators", bundle_id=bid, tlp="TLP:CLEAR", attributable=False), say(".")]
+
+    def isac(include):
+        return [use("match_query", query_id="q1"), say("."), use("match_query", query_id="q1"),
+                use("relay_to_member", member="org_a", bundle_id=bid, tlp="TLP:CLEAR", provenance=prov,
+                    include_submitter=include),
+                use("broadcast_alert", bundle_id=bid, tlp="TLP:CLEAR", message="Sector alert."), say(".")]
+
+    hidden = run(goal=None, org_a=query() + findings(), isac=isac(False), org_b=org_b)
+    sent = [m for m in hidden.wire if m["sender"] == "isac"]
+    assert {m["kind"] for m in sent} == {"relay_to_member", "broadcast_alert"}
+    assert not any(_NAMES_ORG_B.search(str(m["content"])) for m in sent)
+    assert not _NAMES_ORG_B.search(" ".join(user_messages(hidden, "org_a")))
+    shown = run(goal=None, org_a=query() + findings(), isac=isac(True), org_b=org_b)
+    assert _NAMES_ORG_B.search(" ".join(user_messages(shown, "org_a")))  # the check can see a real disclosure

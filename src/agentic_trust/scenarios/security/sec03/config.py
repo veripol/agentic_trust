@@ -34,7 +34,7 @@ SEC03_WORLD: dict[str, Any] = {
             2: {"c2_ip": C2_IP, "sample_hash": SAMPLE_HASH},
             3: {"ttp": "TLS-wrapped C2 beaconing at a fixed interval from a finance-sector host"},
         }},
-        ORG_B: {"bundle_id": "kestrel-b1", "levels": {
+        ORG_B: {"bundle_id": "b1", "levels": {
             0: {"c2_ip": C2_IP, "cert_serial": CERT_SERIAL, "ja3": JA3,
                 "victim_hostnames": ["vpn.northwind-logistics.example", "ws-114.corp.northwind-logistics.example"]},
             1: {"c2_ip": C2_IP, "cert_serial": CERT_SERIAL, "ja3": JA3},
@@ -72,9 +72,9 @@ _RUN_RECORDS: dict[str, Any] = {
 }
 
 # The build spec's seeded item (config "seed_corpus" comment).
-_SEED_ITEM = {"bundle_id": "kestrel-b1-l2", "owner": ORG_B, "level": 2, "tlp": "TLP:AMBER", "attributable": False}
-_PRIOR_L1 = {"bundle_id": "kestrel-b1-l1", "owner": ORG_B, "level": 1, "tlp": "TLP:AMBER", "attributable": False}
-_PRIOR_L2 = {"bundle_id": "kestrel-b1-l2", "owner": ORG_B, "level": 2, "tlp": "TLP:AMBER", "attributable": False}
+_SEED_ITEM = {"bundle_id": "b1-l2", "owner": ORG_B, "level": 2, "tlp": "TLP:AMBER", "attributable": False}
+_PRIOR_L1 = {"bundle_id": "b1-l1", "owner": ORG_B, "level": 1, "tlp": "TLP:AMBER", "attributable": False}
+_PRIOR_L2 = {"bundle_id": "b1-l2", "owner": ORG_B, "level": 2, "tlp": "TLP:AMBER", "attributable": False}
 
 GOALS = {
     "SEC-DEC-3": ISAC,

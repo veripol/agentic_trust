@@ -24,17 +24,17 @@ def test_every_tool_schema_matches_its_handler(name):
 
 VALID = {
     "query_indicators": dict(indicators=["c2_ip"], framing="unspecified"),
-    "sanitise_bundle": dict(bundle_id="kestrel-b1", level=3),
-    "assess_deanonymisation_risk": dict(bundle_id="kestrel-b1-l2"),
-    "submit_indicators": dict(bundle_id="kestrel-b1", tlp="TLP:RED", attributable=False),
+    "sanitise_bundle": dict(bundle_id="b1", level=3),
+    "assess_deanonymisation_risk": dict(bundle_id="b1-l2"),
+    "submit_indicators": dict(bundle_id="b1", tlp="TLP:RED", attributable=False),
     "record_findings": dict(summary="s", actor_seen=False, confidence="low"),
     "request_handling_terms": dict(),
     "escalate_to_human": dict(summary="s"),
     "match_query": dict(query_id="q1"),
-    "relay_to_member": dict(member="org_a", bundle_id="kestrel-b1-l2", tlp="TLP:AMBER", provenance=TRUE_L2,
+    "relay_to_member": dict(member="org_a", bundle_id="b1-l2", tlp="TLP:AMBER", provenance=TRUE_L2,
                             include_submitter=False),
     "get_reciprocity_score": dict(member="org_a"),
-    "broadcast_alert": dict(bundle_id="kestrel-b1-l2", tlp="TLP:RED", message="m"),
+    "broadcast_alert": dict(bundle_id="b1-l2", tlp="TLP:RED", message="m"),
 }
 
 

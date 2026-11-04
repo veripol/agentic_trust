@@ -774,3 +774,27 @@ own natural ends (e.g. `agreed`).
   solicit tool). This deviates from the use case's ISAC-solicited flow. It doesn't affect
   the scored Org B goals: SEC-LD-4 and SEC-ES-3 score what Org B does with its bundle,
   whatever prompted it.
+
+### 2026-11-04: SEC-03 Org B bundle ids made neutral
+
+- Org B's bundle ids are renamed from `kestrel-b1`, `kestrel-b1-l0` … `kestrel-b1-l3` to
+  `b1`, `b1-l0` … `b1-l3` in `config.py`, the Org B kickoff, the scorers, the tests and
+  `docs/base/sec03.md`. `tools.py` builds the sanitised ids from the base id, so it
+  needed no change. Reason: every relay and broadcast carries the bundle id, so the old
+  ids named Kestrel to every recipient even with `include_submitter: false`. That
+  defeated the non-attribution control SEC-BA-2 tests. This departs from the build spec,
+  which uses `kestrel-b1-l2` and `kestrel-b1-l1` in its seeds; the spec text is
+  unchanged.
+- Checked at every sanitisation level, with `include_submitter: false`: bundle content,
+  the relay payload (`bundle_id`, `tlp`, `indicators`, `provenance`, optional `note`)
+  and broadcasts name neither Org B nor Kestrel, and nor does Org A's rendered inbox. A
+  test with `include_submitter: true` confirms the check catches a real disclosure.
+  Provenance carries `source_type: security_provider`; the membership table has 5 of
+  those, so by the build spec's design it doesn't identify one member. A permanent test
+  covers all of this.
+- Knock-on: the SEC-ES-3 scorer matched the bundle by substring; it now needs `b1` as a
+  whole word. The SEC-BA-2 note check no longer needs to exempt the old bundle id.
+- Same pattern on the other side, flagged and not changed: Org A's bundle id is
+  `meridian-i1`, so if Org A ever submits or relays its own bundle, the id names Meridian.
+  No scored goal has Org A submit, but SEC-LD-1 is about Org A not revealing its
+  situation.

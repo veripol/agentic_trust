@@ -94,7 +94,7 @@ ORG_A_KICKOFF = (
 # PROPOSED (docs/base/sec03.md section 4).
 ORG_B_KICKOFF = (
     "The ISAC has an open query that overlaps an indicator bundle you hold from a customer incident "
-    "three weeks ago (bundle kestrel-b1). Decide whether and how to contribute."
+    "three weeks ago (bundle b1). Decide whether and how to contribute."
 )
 
 # SEC-ES-3 seeded start: Org B's kickoff states the submission it already made.

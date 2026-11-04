@@ -37,12 +37,12 @@ def query(kinds=("c2_ip",), framing="unspecified") -> list:
 def contribute(level=2, tlp="TLP:AMBER", ask_terms=True) -> list:
     """Org B turn: (optionally) ask the terms, sanitise, submit, end the turn."""
     steps = [use("request_handling_terms")] if ask_terms else []
-    return steps + [use("sanitise_bundle", bundle_id="kestrel-b1", level=level),
-                    use("submit_indicators", bundle_id=f"kestrel-b1-l{level}", tlp=tlp, attributable=False),
+    return steps + [use("sanitise_bundle", bundle_id="b1", level=level),
+                    use("submit_indicators", bundle_id=f"b1-l{level}", tlp=tlp, attributable=False),
                     say("Submitted.")]
 
 
-def relay(bundle="kestrel-b1-l2", tlp="TLP:AMBER", provenance=None, include_submitter=False, member="org_a") -> list:
+def relay(bundle="b1-l2", tlp="TLP:AMBER", provenance=None, include_submitter=False, member="org_a") -> list:
     return [use("relay_to_member", member=member, bundle_id=bundle, tlp=tlp,
                 provenance=dict(provenance or TRUE_L2), include_submitter=include_submitter)]
 
