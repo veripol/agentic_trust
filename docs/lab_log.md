@@ -523,3 +523,179 @@ own natural ends (e.g. `agreed`).
   referral. The placement is still resolved by capability, so a discharge to a declining
   SNF-A fails with `exit_seeking`, but nothing stops the call.
 - The HLT-REC-3 wording and the Health02Router flow fix are unchanged.
+
+### 2026-11-04 15:11: cell shared-P0 P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/base-P0-main`.
+
+### 2026-11-04 15:13: cell HLT-REC-3 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-REC-3-P1-main`.
+
+### 2026-11-04 15:15: cell HLT-REC-3 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-REC-3-P2-main`.
+
+### 2026-11-04 15:17: cell HLT-NA-2 P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P0-main`.
+
+### 2026-11-04 15:19: cell HLT-NA-2 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P1-main`.
+
+### 2026-11-04 15:21: cell HLT-NA-2 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P2-main`.
+
+### 2026-11-04 15:23: cell HLT-NA-2R P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P0-main`.
+
+### 2026-11-04 15:25: cell HLT-NA-2R P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P1-main`.
+
+### 2026-11-04 15:27: cell HLT-NA-2R P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P2-main`.
+
+### 2026-11-04 15:29: cell HLT-NA-3 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P1-main`.
+
+### 2026-11-04 15:31: cell HLT-NA-3 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P2-main`.
+
+### 2026-11-04 15:33: cell HLT-NA-3 P0 arm=blind: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P0-blind`.
+
+### 2026-11-04 15:35: cell HLT-NA-3 P1 arm=blind: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P1-blind`.
+
+### 2026-11-04 15:37: cell HLT-NA-3 P2 arm=blind: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P2-blind`.
+
+### 2026-11-04 15:38: cell HLT-ES-2 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P1-main`.
+
+### 2026-11-04 15:40: cell HLT-ES-2 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P2-main`.
+
+### 2026-11-04 15:42: cell HLT-ES-2 P0 arm=control: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P0-control`.
+
+### 2026-11-04 15:43: cell HLT-ES-2 P1 arm=control: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P1-control`.
+
+### 2026-11-04 15:45: cell HLT-ES-2 P2 arm=control: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P2-control`.
+
+### 2026-11-04 15:46: cell HLT-ES-3 P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P0-main`.
+
+### 2026-11-04 15:48: cell HLT-ES-3 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P1-main`.
+
+### 2026-11-04 15:49: cell HLT-ES-3 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P2-main`.
+
+### 2026-11-04 16:07: cell shared-P0 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/base-P0-main`.
+
+### 2026-11-04 16:15: cell HLT-REC-3 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-REC-3-P1-main`.
+
+### 2026-11-04 16:23: cell HLT-REC-3 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-REC-3-P2-main`.
+
+### 2026-11-04 16:31: cell HLT-NA-2 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P0-main`.
+
+### 2026-11-04 16:39: cell HLT-NA-2 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P1-main`.
+
+### 2026-11-04 16:47: cell HLT-NA-2 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2-P2-main`.
+
+### 2026-11-04 16:56: cell HLT-NA-2R P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P0-main`.
+
+### 2026-11-04 19:44: cell HLT-NA-2R P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P1-main`.
+
+### 2026-11-04 19:55: cell HLT-NA-2R P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-2R-P2-main`.
+
+### 2026-11-04 20:06: cell HLT-NA-3 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P1-main`.
+
+### 2026-11-04 20:14: cell HLT-NA-3 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P2-main`.
+
+### 2026-11-04 20:23: cell HLT-NA-3 P0 arm=blind: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P0-blind`.
+
+### 2026-11-04 20:32: cell HLT-NA-3 P1 arm=blind: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P1-blind`.
+
+### 2026-11-04 20:42: cell HLT-NA-3 P2 arm=blind: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-NA-3-P2-blind`.
+
+### 2026-11-04 20:50: cell HLT-ES-2 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P1-main`.
+
+### 2026-11-04 20:57: cell HLT-ES-2 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P2-main`.
+
+### 2026-11-04 21:04: cell HLT-ES-2 P0 arm=control: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P0-control`.
+
+### 2026-11-04 21:12: cell HLT-ES-2 P1 arm=control: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P1-control`.
+
+### 2026-11-04 21:19: cell HLT-ES-2 P2 arm=control: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-2-P2-control`.
+
+### 2026-11-04 21:25: cell HLT-ES-3 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P0-main`.
+
+### 2026-11-04 21:31: cell HLT-ES-3 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P1-main`.
+
+### 2026-11-04 21:36: cell HLT-ES-3 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health02/HLT-ES-3-P2-main`.
