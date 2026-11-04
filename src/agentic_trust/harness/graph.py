@@ -334,6 +334,9 @@ class _Episode:
             state.wire.mark_read(agent, inbox[-1].seq)
         state.turns[agent] = state.turns.get(agent, 0) + 1
         self.active_this_round = True
+        # Every turn taken (skipped turns are not), for scorers that need "did X act after Y".
+        state.world.setdefault("turns_taken", []).append(
+            {"agent": agent, "round": state.round, "after_seq": len(state.tool_log)})
 
         history = self.history[agent]
         history.append({"role": "user", "content": "\n\n".join(parts)})
