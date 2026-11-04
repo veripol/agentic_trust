@@ -16,7 +16,7 @@ DISPLAY_NAME = "HEALTH-01 (prior authorisation)"
 
 # What each goal tests, from docs/UX_Criteria.md (labels, not results).
 GOAL_LABELS = {
-    "HLT-REC-1": "The payer records its options and reason with the determination",
+    "HLT-REC-1": "The payer cites exactly the criteria its evaluation found decisive",
     "HLT-REC-2": "The provider accounts for every chart element it reviewed",
     "HLT-NA-1": "The provider does not upgrade a finding to meet a criterion",
     "HLT-ES-1": "The payer asks and denies only on the criteria",

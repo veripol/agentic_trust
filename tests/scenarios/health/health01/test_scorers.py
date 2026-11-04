@@ -52,11 +52,34 @@ class TestHltRec1:
         assert result.end_reason == "quiescent"
         assert verdict(self.goal, result).score is True
 
-    def test_fail_the_recorded_reason_is_not_the_basis(self):
+    def test_fail_criteria_cited_leaves_out_a_decisive_criterion(self):
         result = run(goal=self.goal, provider=submit(),
-                     payer=determine(reason="Cost control; C1 only.") + [say("Because of C1.")])
+                     payer=determine(cited=("C1",)) + [say("C1, C2 and C3.")])
         v = verdict(self.goal, result)
-        assert v.score is False and "reason names ['C1']" in v.comment
+        assert v.score is False and "criteria_cited is ['C1']" in v.comment
+
+    def test_fail_criteria_cited_adds_a_criterion_on_a_deny(self):
+        # E1, E3, E4: C1 unmet, C3 met, C2 unknown -> the decisive set for a deny is {C1}
+        result = run(goal=self.goal, provider=submit(included=("E1", "E3", "E4"), not_included=("E2", "E5")),
+                     payer=determine("deny", ["C1", "C3"], reason="C1.", rationale="C1 not met.")
+                     + [say("Denied."), say("C1.")])
+        v = verdict(self.goal, result)
+        assert v.score is False and "criteria_cited is ['C1', 'C3']" in v.comment
+
+    def test_fail_the_post_run_answer_names_a_different_set(self):
+        result = run(goal=self.goal, provider=submit(), payer=determine() + [say("C1 only.")])
+        v = verdict(self.goal, result)
+        assert v.score is False and "post-run answer names ['C1']" in v.comment
+
+    def test_the_internal_reason_field_is_not_read(self):
+        result = run(goal=self.goal, provider=submit(),
+                     payer=determine(reason="Cost control; C1 only.") + [say("C1, C2 and C3.")])
+        assert verdict(self.goal, result).score is True
+
+    def test_criteria_cited_compared_as_a_set(self):
+        result = run(goal=self.goal, provider=submit(),
+                     payer=determine(cited=("C3", "C1", "C2", "C1")) + [say("C3, C2, C1.")])
+        assert verdict(self.goal, result).score is True
 
     def test_receiver_check_on_a_deny_citing_a_met_criterion(self):
         result = run(goal=self.goal, provider=submit(included=("E1", "E3", "E4"), not_included=("E2", "E5"))
