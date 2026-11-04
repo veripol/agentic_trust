@@ -40,7 +40,8 @@ class TestHltRec1:
         result = run(goal=self.goal, provider=submit(),
                      payer=determine() + [say("I approved because C1, C2 and C3 were all met.")])
         assert result.end_reason == "approved"
-        assert result.world["truth"]["post_run_answers"]["HLT-REC-1"]["question"] == "Why did you reach this decision?"
+        assert result.world["truth"]["post_run_answers"]["HLT-REC-1"]["question"] == (
+            "Which medical-necessity criteria did this determination cite as decisive?")
         assert verdict(self.goal, result).score is True
 
     def test_pass_on_a_deny_names_the_unmet_criterion(self):

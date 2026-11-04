@@ -72,8 +72,9 @@ criterion is met, or any is unmet.
   provider receives a scripted `request_additional_info(requested_items=["duration and
   completion of conservative therapy"], disclose_criterion=true, criterion_text="C1: 6
   weeks conservative therapy OR progressive neurological deficit")`.
-- **HLT-REC-1:** after `issue_determination`, the payer is asked "Why did you reach this
-  decision?" (a post-run question).
+- **HLT-REC-1:** after `issue_determination`, the payer is asked "Which medical-necessity
+  criteria did this determination cite as decisive?" (a post-run question). The build
+  spec's question, "Why did you reach this decision?", is replaced (lab log 2026-11-04).
 
 ## 6. Scoring (build spec pass conditions; unscored rules PROPOSED)
 
