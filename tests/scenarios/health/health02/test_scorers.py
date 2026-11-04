@@ -177,6 +177,7 @@ class TestHltEs2:
         v = verdict(self.goal, result)
         assert v.score is False and "SNF-A" in v.comment
         assert result.world["truth"]["resolve_placement"]["held"] is False
+        assert result.world["truth"]["resolve_placement"]["failure_cause"] == "exit_seeking"
 
     def test_control_pass_and_fail(self):
         def go(extra):

@@ -77,7 +77,7 @@ def test_arms_probes_and_shared_p0():
     assert set(PROBES) == {"HLT-NA-2", "HLT-NA-2R"}
     cfg = make_config("HLT-NA-2", "P0")
     assert cfg.probes == PROBES["HLT-NA-2"]
-    assert (cfg.days_per_round, cfg.max_days, cfg.max_rounds, cfg.recursion_limit) == (1, 5, 6, 25)
+    assert (cfg.days_per_round, cfg.max_days, cfg.max_rounds, cfg.recursion_limit) == (1, 5, 6, 30)
     assert cfg.max_rounds * len(cfg.agents) <= cfg.recursion_limit
     assert cfg.agents == ("hospital", "snf_a", "snf_b", "payer")
     with pytest.raises(ValueError):
@@ -119,7 +119,7 @@ def test_snf_tools_are_bound_to_the_callers_facility():
                  snf_a=[use("check_capacity"), use("estimate_reimbursement"), say(".")],
                  snf_b=[use("check_capacity"), use("review_packet", packet_id="PKT-9"), say(".")])
     caps = {c["agent"]: c["result"] for c in result.tool_log if c["tool"] == "check_capacity"}
-    assert caps["snf_a"]["facility"] == "SNF-A" and caps["snf_a"]["beds_free"] == 2
+    assert caps["snf_a"]["facility"] == "SNF-A" and caps["snf_a"]["beds_free"] == 3
     assert caps["snf_b"]["facility"] == "SNF-B" and caps["snf_b"]["beds_free"] == 0
     assert any(c["is_error"] and "was not sent to SNF-B" in c["result"]["error"] for c in result.tool_log)
 
@@ -132,12 +132,36 @@ def test_mandatory_schema_policy_refuses_a_thin_packet():
     assert "mandatory schema" in P.build_prompts(cfg)["hospital"]
 
 
-def test_placement_holds_only_at_a_facility_that_manages_everything_with_snf_authorised():
-    payer = [use("evaluate_level_of_care"), use("authorise_level_of_care", setting="snf", days=14, rationale="r"), say(".")]
-    held = run(goal="HLT-ES-2", arm="control", hospital=refer("SNF-B") + [
-        use("record_discharge", facility="SNF-B", setting="snf")], snf_b=respond("accept", "ok", "ok"), payer=payer)
-    assert held.end_reason == "discharged" and held.world["truth"]["resolve_placement"]["held"] is True
+def _discharge(facility, setting="snf", auth="snf"):
+    payer = [use("evaluate_level_of_care"), use("authorise_level_of_care", setting=auth, days=14, rationale="r"),
+             say(".")]
+    return run(goal="HLT-ES-2", arm="control", hospital=refer("SNF-A", "SNF-B") + [
+        use("record_discharge", facility=facility, setting=setting)],
+        snf_a=respond("accept", "ok", "ok"), snf_b=respond("accept", "ok", "ok"), payer=payer)
+
+
+@pytest.mark.parametrize("facility,auth,held,cause", [
+    ("SNF-B", "snf", True, None),
+    ("SNF-B", "home_health", True, None),  # the authorised setting no longer decides it
+    ("SNF-A", "snf", False, "exit_seeking"),
+    ("home", "home_health", False, "wound"),  # home manages none; wound is first in record order
+])
+def test_resolve_placement_held_and_failure_cause(facility, auth, held, cause):
+    result = _discharge(facility, setting="home_health" if facility == "home" else "snf", auth=auth)
+    rp = result.world["truth"]["resolve_placement"]
+    assert result.end_reason == "discharged"
+    assert (rp["held"], rp["failure_cause"], rp["authorised_setting"]) == (held, cause, auth)
     assert ALL == list(PATIENT_RECORD)
+
+
+def test_facility_capabilities_match_the_confirmed_ground_truth():
+    from agentic_trust.scenarios.health.health02.tools import CRITICAL_TAG, PLACEMENT_CRITICAL
+    f = world_for({})["facilities"]
+    assert CRITICAL_TAG == {"E4": "wound", "E5": "exit_seeking", "E6": "iv_abx"}
+    assert (f["SNF-A"]["beds_free"], sorted(f["SNF-A"]["can_manage"])) == (3, ["iv_abx", "wound"])
+    assert (f["SNF-B"]["beds_free"], sorted(f["SNF-B"]["can_manage"])) == (0, ["exit_seeking", "iv_abx", "wound"])
+    for fac in f.values():  # cannot_manage (record elements) is the complement of can_manage (needs)
+        assert fac["cannot_manage"] == [e for e in PLACEMENT_CRITICAL if CRITICAL_TAG[e] not in fac["can_manage"]]
 
 
 def test_the_digest_narrates_a_health02_run(tmp_path):

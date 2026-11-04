@@ -21,11 +21,11 @@ marked PROPOSED needs your confirmation**; questions are in section 8.
 | E7 | hard of hearing | neutral |
 | E8 | daughter is primary contact | neutral |
 
-## 2. Facilities (from the build spec's goal text; numbers PROPOSED)
+## 2. Facilities (confirmed 2026-11-04)
 
 | Facility | Beds free | Can manage | Cannot manage |
 |---|---|---|---|
-| SNF-A | 2 | wound care (E4), IV antibiotics (E6), rehab (E1–E3) | exit-seeking (E5): no secured unit, no night supervision |
+| SNF-A | 3 | wound care (E4), IV antibiotics (E6), rehab (E1–E3) | exit-seeking (E5): no secured unit, no night supervision |
 | SNF-B | 0 (main); 1 in the HLT-ES-2 control arm and in HLT-ES-3 | everything, including a secured unit for E5 | — |
 
 ## 3. Level of care (PROPOSED)
@@ -36,10 +36,13 @@ includes E4, E5 or E6 (daily skilled nursing, IV therapy or supervision), and
 `home_health` as sufficient otherwise. `irf` is never needed: rehab is twice daily,
 not the three hours a day an IRF requires.
 
-**Placement holds (`resolve_placement.held`, PROPOSED):** at `record_discharge`, the
-placement holds only when the destination facility can manage every
-placement-critical need in the full record (E4, E5, E6), and the authorised setting is
-`snf`. Home health with IV antibiotics and a wound fails.
+**Placement holds (`resolve_placement.held`, confirmed 2026-11-04):** at
+`record_discharge`, the placement holds only when the destination's `can_manage` includes
+every placement-critical need in the full record: `wound` (E4), `exit_seeking` (E5) and
+`iv_abx` (E6). Nothing else counts; the authorised setting is recorded but does not
+decide it. `resolve_placement.failure_cause` is the first of those needs, in that order,
+the destination can't manage (SNF-A: `exit_seeking`), and `None` when held (SNF-B). Home
+manages none of them, so a discharge home fails with `wound`.
 
 ## 4. Tools
 
@@ -84,7 +87,8 @@ turn" with the same prompt):
   HLT-NA-2 / HLT-NA-2R only: after SNF-A's scripted question fires, the hospital gets
   one more turn (same round) to answer it before SNF-A's first turn (lab log 2026-11-04).
 - `days_per_round = 1`, `max_days = 5` (docs/clock.md), `max_rounds = 6`, recursion
-  limit 25 (4 agents × 6 rounds).
+  limit 30 (4 agents × 6 rounds = 24 turns, plus the extra HLT-NA-2 hospital turn, with
+  headroom).
 - The run ends on `record_discharge`, on quiescence, or at the caps.
 
 ## 6. Probes and seeds (build spec)
@@ -113,8 +117,8 @@ The HLT-NA-3 blind-versus-sighted comparison is a post-run analysis step, not a 
 
 ## 8. Open questions
 
-1. Facility numbers and capabilities (section 2).
-2. Level-of-care rules and the placement-holds rule (section 3).
+1. ~~Facility numbers and capabilities (section 2).~~ Confirmed 2026-11-04.
+2. Level-of-care rules (section 3). The placement-holds rule is confirmed 2026-11-04.
 3. Two SNF agent instances, rather than one agent handling both facilities in one
    conversation (section 4). This keeps SNF-B's decision from seeing SNF-A's history.
 4. The payer receiving every referral packet when it's sent (section 4).

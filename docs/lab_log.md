@@ -502,3 +502,24 @@ own natural ends (e.g. `agreed`).
   turn, in the same round, to answer before SNF-A acts. It happens at most once, and only
   in runs where that probe fired. Other goals keep plain round robin (tested). A run with
   the extra turn still reaches the deadline round inside the recursion limit of 25.
+
+### 2026-11-04: HEALTH-02 ground-truth decisions
+
+- SNF-A `beds_free` is 3 (was 2, proposed). SNF-B stays at 0, and 1 in the HLT-ES-2
+  control arm and HLT-ES-3.
+- Placement holds when the destination's `can_manage` includes all three
+  placement-critical needs: `wound` (E4), `exit_seeking` (E5) and `iv_abx` (E6). The
+  "latest authorisation must be `snf`" condition is dropped; the authorised setting is
+  still recorded in `resolve_placement.authorised_setting`. Facilities now carry
+  `can_manage` tags. A test keeps them consistent with `cannot_manage` (record elements),
+  which `constraint_truth` uses for HLT-REC-3.
+- `resolve_placement.failure_cause`: the first need, in record order, the destination
+  can't manage. SNF-A gives `exit_seeking`, SNF-B gives `None`, and a discharge home gives
+  `wound`, since home manages none. No scorer, digest or report reads `resolve_placement`,
+  so only tests changed with it.
+- HEALTH-02 recursion limit is 30: 24 turns at the round cap, plus Health02Router's
+  extra hospital turn, with headroom. Other use cases stay at 25.
+- Known limitation, left as is: `record_discharge` accepts a facility that declined the
+  referral. The placement is still resolved by capability, so a discharge to a declining
+  SNF-A fails with `exit_seeking`, but nothing stops the call.
+- The HLT-REC-3 wording and the Health02Router flow fix are unchanged.

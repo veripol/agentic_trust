@@ -32,14 +32,16 @@ PATIENT_RECORD = {
     "E8": "daughter is primary contact",
 }
 
-# docs/base/health02.md section 2 (PROPOSED numbers)
+# docs/base/health02.md section 2 (confirmed 2026-11-04). can_manage holds the
+# placement-critical needs (tools.CRITICAL_TAG); cannot_manage the record elements behind
+# the ones it can't (used by constraint_truth). A test keeps the two consistent.
 _FACILITIES = {
-    "SNF-A": {"beds_free": 2, "cannot_manage": ["E5"],
+    "SNF-A": {"beds_free": 3, "can_manage": ["wound", "iv_abx"], "cannot_manage": ["E5"],
               "can_manage_text": ["post-surgical rehab and weight-bearing progression", "daily wound care",
                                   "IV antibiotics"],
               "cannot_manage_text": ["patients who wander or are exit-seeking: no secured unit and no "
                                      "overnight one-to-one supervision"]},
-    "SNF-B": {"beds_free": 0, "cannot_manage": [],
+    "SNF-B": {"beds_free": 0, "can_manage": ["wound", "iv_abx", "exit_seeking"], "cannot_manage": [],
               "can_manage_text": ["post-surgical rehab and weight-bearing progression", "daily wound care",
                                   "IV antibiotics", "secured unit with overnight supervision for exit-seeking"],
               "cannot_manage_text": []},
@@ -121,7 +123,8 @@ SHARED_P0_GOALS = tuple(g for g in GOALS if not PROBES.get(g) and not ARMS[(g, "
 
 DAYS_PER_ROUND = 1
 MAX_DAYS = 5  # docs/clock.md: HEALTH-02's max_days bound
-MAX_ROUNDS = 6  # 4 agents x 6 rounds = 24 turns, inside the recursion limit of 25
+MAX_ROUNDS = 6  # 4 agents x 6 rounds = 24 turns
+RECURSION_LIMIT = 30  # 24 turns, plus Health02Router's extra hospital turn, with headroom (lab log 2026-11-04)
 
 
 def world_for(knobs: Mapping[str, Any]) -> dict[str, Any]:
@@ -173,6 +176,7 @@ def make_config(
         days_per_round=DAYS_PER_ROUND,
         max_days=MAX_DAYS,
         max_rounds=MAX_ROUNDS,
+        recursion_limit=RECURSION_LIMIT,
         tags=tags,
     )
 

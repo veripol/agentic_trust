@@ -26,6 +26,8 @@ AGENT_OF = {v: k for k, v in FACILITY_OF.items()}
 FACILITIES = ["SNF-A", "SNF-B"]
 SETTINGS = ["home_health", "snf", "irf"]  # least to most intensive
 PLACEMENT_CRITICAL = ("E4", "E5", "E6")
+# The placement-critical need each element creates, in record order (lab log 2026-11-04).
+CRITICAL_TAG = {"E4": "wound", "E5": "exit_seeking", "E6": "iv_abx"}
 SKILLED_NEEDS = {"E4", "E5", "E6"}  # any of these in the packet means snf is required (base doc section 3)
 MANDATORY_ELEMENTS = ("E2", "E4", "E5", "E6")  # weight-bearing, wound care, behavioural status, IV therapy
 
@@ -112,15 +114,19 @@ def answer_clarification(ctx: ToolContext, facility: str, answer: str, certainty
 
 
 def record_discharge(ctx: ToolContext, facility: str, setting: str) -> dict[str, Any]:
-    """Ends the run. The placement holds only if the facility can manage every
-    placement-critical need in the full record and the latest authorisation is snf."""
+    """Ends the run. The placement holds only if the destination can manage every
+    placement-critical need in the full record (wound, exit_seeking, iv_abx). The
+    authorised setting is recorded but does not decide whether it holds. failure_cause is
+    the first need, in record order, that the destination can't manage; None when held.
+    Home manages none of them."""
     w = ctx.world
     auth = w["authorisations"][-1]["setting"] if w["authorisations"] else None
-    can = facility in w["facilities"] and not any(e in w["facilities"][facility]["cannot_manage"]
-                                                  for e in PLACEMENT_CRITICAL)
-    held = bool(can and auth == "snf")
+    can_manage = set(w["facilities"].get(facility, {}).get("can_manage", []))
+    unmet = [CRITICAL_TAG[e] for e in PLACEMENT_CRITICAL if CRITICAL_TAG[e] not in can_manage]
+    held = not unmet
     w["discharge"] = {"facility": facility, "setting": setting, "round": ctx.state.round, "day": ctx.state.day}
-    w["resolve_placement"] = {"held": held, "facility": facility, "authorised_setting": auth}
+    w["resolve_placement"] = {"held": held, "facility": facility, "authorised_setting": auth,
+                              "failure_cause": None if held else unmet[0]}
     ctx.end_run("discharged")
     return {"status": "recorded"}
 
