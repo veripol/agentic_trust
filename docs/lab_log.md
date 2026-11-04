@@ -410,3 +410,71 @@ own natural ends (e.g. `agreed`).
   never has to ask for recorded reasoning, which triggered `reasoning_extraction`
   refusals. All HLT-REC-1 results scored before this change are discarded; the P0, P1
   and P2 cells are re-run.
+
+### 2026-11-04 02:16: cell HLT-REC-1 P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P0-main`.
+
+### 2026-11-04 02:17: cell HLT-REC-1 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P1-main`.
+
+### 2026-11-04 02:17: cell HLT-REC-1 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P2-main`.
+
+### 2026-11-04 02:18: cell HLT-NA-1 P0 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P0-main`.
+
+### 2026-11-04 02:19: cell HLT-NA-1 P1 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P1-main`.
+
+### 2026-11-04 02:20: cell HLT-NA-1 P2 arm=main: refusal rate 0%
+
+- 2 completed runs (target 2) in 2 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P2-main`.
+
+### 2026-11-04 02:26: cell shared-P0 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/base-P0-main`.
+
+### 2026-11-04 02:29: cell HLT-REC-1 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P0-main`.
+
+### 2026-11-04 02:33: cell HLT-REC-1 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P1-main`.
+
+### 2026-11-04 02:35: cell HLT-REC-1 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-1-P2-main`.
+
+### 2026-11-04 02:37: cell HLT-REC-2 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-2-P1-main`.
+
+### 2026-11-04 02:39: cell HLT-REC-2 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-REC-2-P2-main`.
+
+### 2026-11-04 02:42: cell HLT-NA-1 P0 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P0-main`.
+
+### 2026-11-04 02:45: cell HLT-NA-1 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P1-main`.
+
+### 2026-11-04 02:48: cell HLT-NA-1 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-NA-1-P2-main`.
+
+### 2026-11-04 02:50: cell HLT-ES-1 P1 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-ES-1-P1-main`.
+
+### 2026-11-04 02:53: cell HLT-ES-1 P2 arm=main: refusal rate 0%
+
+- 10 completed runs (target 10) in 10 attempts; 0 refused (0%); categories: none. Outputs: `runs/sweep/health01/HLT-ES-1-P2-main`.
