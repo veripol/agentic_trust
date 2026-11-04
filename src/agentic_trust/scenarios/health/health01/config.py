@@ -9,8 +9,12 @@ from __future__ import annotations
 import copy
 from typing import Any, Mapping
 
-from agentic_trust.harness.graph import AgentSpec, PostRunQuestion, Probe, RoundRobinRouter, Scenario, ScriptedCall
-from agentic_trust.harness.state import AgentAssignment, RunConfig, World, thaw
+from dataclasses import dataclass
+
+from agentic_trust.harness.graph import (
+    AgentSpec, PostRunQuestion, Probe, RouteDecision, RoundRobinRouter, Scenario, ScriptedCall,
+)
+from agentic_trust.harness.state import AgentAssignment, RunConfig, RunState, World, thaw
 
 from .prompts import KICKOFF
 from .tools import PAYER, PAYER_TOOLS, PROVIDER, PROVIDER_TOOLS
@@ -144,9 +148,44 @@ def init_world(config: RunConfig) -> World:
     return World(world_for(config.knobs))
 
 
+@dataclass(frozen=True)
+class Health01Router:
+    """Round robin provider -> payer, with one exception for the HLT-NA-1 probe.
+
+    The probe's scripted RFI lands in the provider's inbox during the turn in which it
+    calls submit_prior_auth, so the provider cannot read it until its next turn. Plain
+    round robin hands the payer the submission first, and an approval ends the run
+    before the provider ever answers, which leaves HLT-NA-1 unscored. So when the
+    HLT-NA-1 probe has fired, the provider has not yet answered with respond_to_rfi, and
+    the RFI is still unread, the provider gets one more turn, inside the same round,
+    before the payer acts. Once it has read the RFI, round robin resumes, whether or not
+    it answered. Runs without that probe never meet the condition, so every other goal
+    keeps the plain turn order.
+    """
+
+    base: RoundRobinRouter = RoundRobinRouter(AGENTS)
+
+    def first(self, state: RunState) -> str:
+        return self.base.first(state)
+
+    def next(self, state: RunState, just_ran: str) -> RouteDecision:
+        if just_ran == PROVIDER and _na1_rfi_unanswered(state):
+            return RouteDecision(PROVIDER, round_complete=False)
+        return self.base.next(state, just_ran)
+
+
+def _na1_rfi_unanswered(state: RunState) -> bool:
+    fired = any(p["goal"] == "HLT-NA-1" for p in state.world.get("probes_fired", []))
+    if not fired:
+        return False
+    answered = any(c.agent == PROVIDER and c.tool == "respond_to_rfi" and not c.is_error for c in state.tool_log)
+    rfi_unread = any(m.sender == PAYER and m.scripted for m in state.wire.unread(PROVIDER))
+    return not answered and rfi_unread
+
+
 SCENARIO = Scenario(
     use_case=USE_CASE,
     agents={PROVIDER: AgentSpec(PROVIDER, PROVIDER_TOOLS), PAYER: AgentSpec(PAYER, PAYER_TOOLS)},
-    router=RoundRobinRouter(AGENTS),
+    router=Health01Router(),
     init_world=init_world,
 )

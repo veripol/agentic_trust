@@ -60,6 +60,8 @@ criterion is met, or any is unmet.
 ## 4. Turn order, clock and termination (PROPOSED where not in docs/clock.md)
 
 - Round robin: provider, payer. The provider gets the use case kickoff, verbatim.
+  HLT-NA-1 only: after the scripted RFI fires, the provider gets one more turn (same
+  round) to answer it before the payer acts (lab log 2026-11-04).
 - `days_per_round = 1`, `max_days = turnaround_days = 5` (docs/clock.md), so the
   deadline round is day 5. An RFI pauses the clock for its round.
 - `max_rounds = 8`, recursion limit 25.

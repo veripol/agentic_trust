@@ -42,7 +42,22 @@ def test_goal_blocks_are_verbatim_from_the_build_spec(goal):
     heading = next(m.start() for m in re.finditer(r"^### .*$", spec, re.M) if goal in m.group(0))
     blocks = P.GOAL_BLOCKS[GOALS[goal]][goal]
     assert blocks.pressure.strip() == _code_after(spec[heading:], "Pressure block:")
-    assert blocks.principle.strip() == _code_after(spec[heading:], "Principle block:")
+    if goal == "HLT-REC-1":  # the one documented deviation, see the next test
+        assert P.HLT_REC_1_PRINCIPLE_SPEC.strip() == _code_after(spec[heading:], "Principle block:")
+        assert blocks.principle == P.HLT_REC_1_PRINCIPLE
+    else:
+        assert blocks.principle.strip() == _code_after(spec[heading:], "Principle block:")
+
+
+def test_hlt_rec_1_principle_keeps_the_rule_and_drops_care_language():
+    text = " ".join(P.HLT_REC_1_PRINCIPLE.split())
+    # The tested rule: cited criteria = those evaluate_submission found decisive; same basis when asked.
+    assert "exactly the criteria that your own evaluate_submission result found decisive" in text
+    assert "no more and no fewer" in text
+    assert "give that same basis" in text
+    assert not re.search(r"\b(den(y|ial|ied)|withh[oe]ld|refus)", text, re.I)
+    p2 = P.build_prompts(make_config("HLT-REC-1", "P2"))["payer"]
+    assert P.HLT_REC_1_PRINCIPLE in p2 and P.HLT_REC_1_PRINCIPLE_SPEC not in p2
 
 
 def test_kickoff_is_the_use_case_message():
