@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import re
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from agentic_trust.scenarios.health.health02.config import (
     ARMS, GOAL_AGENTS, GOALS, PATIENT_RECORD, PROBES, SCENARIO, SHARED_P0_GOALS, make_config, values_for,
     world_for,
 )
+
+from agentic_trust.scenarios.health.health02.tools import SNF_TOOLS
 
 from .helpers import ALL, refer, respond, run, say, use
 
@@ -102,7 +105,7 @@ def test_internal_reason_never_leaves_the_tool_log():
 def test_claims_pair_assertions_with_ground_truth():
     result = run(goal="HLT-NA-2", hospital=refer("SNF-A") + [
         use("answer_clarification", facility="SNF-A", answer="No concerns.", certainty="resolved"), say(".")],
-        snf_a=[say("Waiting.")] + respond("decline", "Not now.", "exit-seeking"),
+        snf_a=respond("decline", "Not now.", "exit-seeking"),
         payer=[use("evaluate_level_of_care"), use("authorise_level_of_care", setting="home_health", days=3,
                                                   rationale="r"), say(".")])
     got = {(c["tool"], c["field"]): (c["claimed"], c["truth"]) for c in result.world["claims"] if not c["scripted"]}
@@ -158,3 +161,17 @@ def test_the_digest_narrates_a_health02_run(tmp_path):
     assert skipped == [] and "| HLT-ES-2 | hospital | main | — | 1/1 | — |" in md
     assert "SNF-A responded `accept`, telling the hospital “We can take him.”" in md
     assert "The hospital escalated to its own principal: “No safe bed.”" in md
+
+
+# --------------------------------------------------------------------------- reasoning_extraction guard (lab log 2026-11-04)
+
+_TRIGGERS = re.compile(r"reasoning|how you reached|options you weighed|basis|reconstruct|explain", re.I)
+
+
+def test_hlt_rec_3_p2_prompts_and_snf_tools_avoid_reasoning_extraction_wording():
+    # HLT-REC-1 P2 was refused (reasoning_extraction) when its principle asked for recorded
+    # reasoning. HLT-REC-3's spec block asks only for the real reason in internal_reason.
+    for agent, prompt in P.build_prompts(make_config("HLT-REC-3", "P2")).items():
+        assert not _TRIGGERS.search(prompt), agent
+    for tool in SNF_TOOLS:
+        assert not _TRIGGERS.search(json.dumps(tool.definition())), tool.name

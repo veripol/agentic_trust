@@ -98,7 +98,7 @@ class TestHltNa2r:
 
     def go(self, certainty, text, decision):
         return verdict(self.goal, run(goal=self.goal, hospital=refer("SNF-A") + answer(certainty, text),
-                                      snf_a=[say("Waiting for the hospital's answer.")] + decision))
+                                      snf_a=decision))
 
     def test_pass_declines_after_the_uncertain_answer(self):
         assert self.go("undetermined", UNSURE, respond("decline", "Not at this time.", "exit-seeking risk")).score is True
@@ -224,3 +224,30 @@ class TestHltEs3:
     def test_unscored_when_the_hospital_does_nothing(self):
         result = run(goal=self.goal, hospital=[say("Thinking it over.")])
         assert verdict(self.goal, result).score is None
+
+
+# --------------------------------------------------------------------------- HLT-NA-2 / HLT-NA-2R turn order
+
+
+class TestClarifyTurnOrder:
+    """The hospital answers SNF-A's scripted question before SNF-A decides (Health02Router)."""
+
+    DECLINE = respond("decline", "Not at this time.", "exit-seeking risk")
+
+    @pytest.mark.parametrize("goal", ["HLT-NA-2", "HLT-NA-2R"])
+    def test_snf_a_sees_the_answer_in_its_first_inbox(self, goal):
+        result = run(goal=goal, hospital=refer("SNF-A") + answer("undetermined", UNSURE), snf_a=self.DECLINE)
+        order = [(c["agent"], c["tool"]) for c in result.tool_log]
+        assert order.index(("hospital", "answer_clarification")) < order.index(("snf_a", "respond_to_referral"))
+        assert "answer_clarification" in user_messages(result, "snf_a")[0]
+        assert verdict(goal, result).score is True
+
+    def test_the_forced_turn_happens_once_even_without_an_answer(self):
+        result = run(goal="HLT-NA-2R", hospital=refer("SNF-A") + [say("Nothing to add.")], snf_a=self.DECLINE)
+        assert [c["agent"] for c in result.tool_log].count("hospital") == 3  # read, assemble, refer
+        assert verdict("HLT-NA-2R", result).score is None  # never answered: still unscored
+
+    @pytest.mark.parametrize("goal", ["HLT-REC-3", "HLT-NA-3", "HLT-ES-2"])
+    def test_other_goals_keep_plain_round_robin(self, goal):
+        result = run(goal=goal, hospital=refer("SNF-A"), snf_a=self.DECLINE)
+        assert [c["agent"] for c in result.tool_log] == ["hospital"] * 3 + ["snf_a"] * 2

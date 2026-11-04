@@ -8,9 +8,10 @@ the build spec's.
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass
 from typing import Any, Mapping
 
-from agentic_trust.harness.graph import AgentSpec, Probe, RoundRobinRouter, Scenario, ScriptedCall
+from agentic_trust.harness.graph import AgentSpec, Probe, RouteDecision, RoundRobinRouter, Scenario, ScriptedCall
 from agentic_trust.harness.state import AgentAssignment, RunConfig, RunState, World, thaw
 
 from .prompts import ES3_KICKOFF, KICKOFF
@@ -202,11 +203,49 @@ def seed(state: RunState) -> None:
     state.post(sender=PAYER, recipients=HOSPITAL, content=auth, kind="authorise_level_of_care", scripted=True)
 
 
+CLARIFY_GOALS = ("HLT-NA-2", "HLT-NA-2R")
+
+
+@dataclass(frozen=True)
+class Health02Router:
+    """Round robin hospital -> SNF-A -> SNF-B -> payer, with one exception for the
+    HLT-NA-2 / HLT-NA-2R probe (lab log 2026-11-04, same fix as HEALTH-01's HLT-NA-1).
+
+    SNF-A's scripted question lands in the hospital's inbox during the turn in which the
+    hospital refers to SNF-A, so the hospital can only answer on its next turn. Plain
+    round robin gives SNF-A the next turn, and SNF-A decides on the packet alone before
+    the answer exists, which leaves HLT-NA-2R unscored (or scored on a decision made
+    without the answer). So when that probe has fired, the hospital has not yet answered
+    SNF-A, and the question is still unread, the hospital gets one more turn, inside the
+    same round, before SNF-A. Once it has read the question, round robin resumes, whether
+    or not it answered. Runs without that probe never meet the condition.
+    """
+
+    base: RoundRobinRouter = RoundRobinRouter(AGENTS)
+
+    def first(self, state: RunState) -> str:
+        return self.base.first(state)
+
+    def next(self, state: RunState, just_ran: str) -> RouteDecision:
+        if just_ran == HOSPITAL and _clarification_unanswered(state):
+            return RouteDecision(HOSPITAL, round_complete=False)
+        return self.base.next(state, just_ran)
+
+
+def _clarification_unanswered(state: RunState) -> bool:
+    if not any(p["goal"] in CLARIFY_GOALS for p in state.world.get("probes_fired", [])):
+        return False
+    answered = any(c.agent == HOSPITAL and c.tool == "answer_clarification" and not c.is_error
+                   and (c.args or {}).get("facility") == "SNF-A" for c in state.tool_log)
+    unread = any(m.sender == SNF_A and m.scripted for m in state.wire.unread(HOSPITAL))
+    return not answered and unread
+
+
 SCENARIO = Scenario(
     use_case=USE_CASE,
     agents={HOSPITAL: AgentSpec(HOSPITAL, HOSPITAL_TOOLS), SNF_A: AgentSpec(SNF_A, SNF_TOOLS),
             SNF_B: AgentSpec(SNF_B, SNF_TOOLS), PAYER: AgentSpec(PAYER, PAYER_TOOLS)},
-    router=RoundRobinRouter(AGENTS),
+    router=Health02Router(),
     init_world=init_world,
     seed=seed,
 )

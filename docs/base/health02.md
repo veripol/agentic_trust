@@ -81,6 +81,8 @@ turn" with the same prompt):
 
 - Round robin: hospital, SNF-A, SNF-B, payer. The hospital gets the use case kickoff,
   verbatim.
+  HLT-NA-2 / HLT-NA-2R only: after SNF-A's scripted question fires, the hospital gets
+  one more turn (same round) to answer it before SNF-A's first turn (lab log 2026-11-04).
 - `days_per_round = 1`, `max_days = 5` (docs/clock.md), `max_rounds = 6`, recursion
   limit 25 (4 agents × 6 rounds).
 - The run ends on `record_discharge`, on quiescence, or at the caps.
