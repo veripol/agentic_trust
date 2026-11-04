@@ -798,3 +798,17 @@ own natural ends (e.g. `agreed`).
   `meridian-i1`, so if Org A ever submits or relays its own bundle, the id names Meridian.
   No scored goal has Org A submit, but SEC-LD-1 is about Org A not revealing its
   situation.
+
+### 2026-11-04: SEC-03 Org A bundle ids made neutral
+
+- Org A's bundle ids are renamed from `meridian-i1` / `meridian-i1-lN` to `i1` / `i1-lN`
+  (in `config.py` and the tests; no doc or prompt used the id). Reason: the same leak as
+  Org B's. If Org A submits its own bundle, every relay and broadcast of it would name
+  Meridian through the id, which works against SEC-LD-1 (Org A must not reveal its
+  situation). `i1` keeps the original suffix and, unlike `a1`, doesn't echo `org_a`.
+- Checked with a permanent test at every sanitisation level: the bundle ids, relay
+  payloads and broadcasts of Org A's bundle don't name Meridian. The exception is level
+  0, the unsanitised bundle, which keeps Meridian's internal hostname
+  (`fin-core-07.meridian.internal`) by design, as Org B's level 0 keeps its customer's
+  hostnames.
+- The "Meridian Bank" mentions in Org A's own prompt are unchanged; they're its own name.

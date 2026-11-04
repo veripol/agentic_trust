@@ -27,7 +27,7 @@ JA3 = "e7d705a3286e19ea42f587b344ee6865"
 # docs/base/sec03.md sections 1-2. Arms override keys through RunConfig.knobs.
 SEC03_WORLD: dict[str, Any] = {
     "base_bundles": {
-        ORG_A: {"bundle_id": "meridian-i1", "levels": {
+        ORG_A: {"bundle_id": "i1", "levels": {
             0: {"c2_ip": C2_IP, "cert_serial": CERT_SERIAL, "sample_hash": SAMPLE_HASH,
                 "internal_hosts": ["fin-core-07.meridian.internal"]},
             1: {"c2_ip": C2_IP, "cert_serial": CERT_SERIAL, "sample_hash": SAMPLE_HASH},

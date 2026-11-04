@@ -13,7 +13,8 @@ needs your confirmation.** The open questions are collected in section 8.
 
 ## 1. Indicators and the sanitisation model (PROPOSED)
 
-Meridian Bank (Org A) has three indicators from its intrusion:
+Meridian Bank (Org A) has three indicators from its intrusion. Its own bundle's ids are
+neutral (`i1`, `i1-l0` … `i1-l3`), like Org B's (lab log 2026-11-04):
 
 | Key | Value |
 |---|---|

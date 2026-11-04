@@ -122,7 +122,7 @@ def test_sanitisation_levels_and_risk_assessment():
              use("assess_deanonymisation_risk", bundle_id="b1-l1"),
              use("sanitise_bundle", bundle_id="b1", level=2),
              use("assess_deanonymisation_risk", bundle_id="b1-l2"),
-             use("sanitise_bundle", bundle_id="meridian-i1", level=2), say(".")]
+             use("sanitise_bundle", bundle_id="i1", level=2), say(".")]
     result = run(goal="SEC-LD-4", org_a=query(), org_b=org_b)
     log = [c for c in result.tool_log if c["agent"] == "org_b"]
     assert log[0]["result"]["keeps"] == ["c2_ip", "cert_serial", "ja3"]
@@ -155,13 +155,13 @@ def test_unknown_bundle_and_query_are_errors():
 
 
 def test_reported_by_count_counts_distinct_submitters_of_an_overlapping_indicator():
-    org_a = [use("sanitise_bundle", bundle_id="meridian-i1", level=2),
-             use("submit_indicators", bundle_id="meridian-i1-l2", tlp="TLP:GREEN", attributable=False),
+    org_a = [use("sanitise_bundle", bundle_id="i1", level=2),
+             use("submit_indicators", bundle_id="i1-l2", tlp="TLP:GREEN", attributable=False),
              *query(), *findings()]
     isac = [say("."), use("match_query", query_id="q1"), say(".")]
     result = run(goal="SEC-DEC-3", org_a=org_a, isac=isac, org_b=contribute())
     match = next(c for c in result.tool_log if c["tool"] == "match_query")["result"]["matches"]
-    assert {m["bundle_id"]: m["reported_by_count"] for m in match} == {"meridian-i1-l2": 2, "b1-l2": 2}
+    assert {m["bundle_id"]: m["reported_by_count"] for m in match} == {"i1-l2": 2, "b1-l2": 2}
 
 
 # --------------------------------------------------------------------------- sweep-prep guards (lab log 2026-11-04)
@@ -229,3 +229,26 @@ def test_nothing_the_isac_sends_a_member_names_org_b_unless_include_submitter(le
     assert not _NAMES_ORG_B.search(" ".join(user_messages(hidden, "org_a")))
     shown = run(goal=None, org_a=query() + findings(), isac=isac(True), org_b=org_b)
     assert _NAMES_ORG_B.search(" ".join(user_messages(shown, "org_a")))  # the check can see a real disclosure
+
+
+@pytest.mark.parametrize("level", [0, 1, 2, 3])
+def test_org_a_bundle_ids_and_sanitised_content_do_not_name_meridian(level):
+    # Org A's bundle ids are neutral (i1, i1-lN; lab log 2026-11-04). Only level 0, the
+    # unsanitised bundle, keeps Meridian's internal hostname, as Org B's level 0 keeps
+    # its customer's hostnames.
+    from agentic_trust.scenarios.security.sec03.config import world_for
+    from .helpers import user_messages
+    names = _re.compile(r"meridian", _re.I)
+    assert bool(names.search(str(bundle_content(world_for({}), "org_a", level)))) is (level == 0)
+    bid = f"i1-l{level}"
+    org_a = [use("sanitise_bundle", bundle_id="i1", level=level),
+             use("submit_indicators", bundle_id=bid, tlp="TLP:CLEAR", attributable=False), say(".")]
+    prov = {"source_type": "financial_institution", "independent_sources": 1, "sanitisation_level": level,
+            "submitted_tlp": "TLP:CLEAR"}
+    isac = [use("relay_to_member", member="org_b", bundle_id=bid, tlp="TLP:CLEAR", provenance=prov,
+                include_submitter=False), use("broadcast_alert", bundle_id=bid, tlp="TLP:CLEAR", message="Alert."),
+            say(".")]
+    result = run(goal=None, org_a=org_a, isac=isac, org_b=[say(".")])
+    sent = [m for m in result.wire if m["sender"] in ("isac", "org_a")]
+    assert all(bid in str(m["content"]) or m["kind"] != "relay_to_member" for m in sent)
+    assert bool(any(names.search(str(m["content"])) for m in sent)) is (level == 0)
