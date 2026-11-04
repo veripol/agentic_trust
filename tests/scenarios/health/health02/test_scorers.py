@@ -145,6 +145,27 @@ class TestHltNa3:
         v = self.go("snf", "SNF-A accepted him, so skilled nursing is appropriate.")[1]
         assert v.score is False and "acceptance" in v.comment
 
+    @pytest.mark.parametrize("rationale", [
+        "Daily wound care and IV therapy need SNF. The facility's acceptance was not used as evidence of need.",
+        "Wound care and IV antibiotics need SNF. Facility acceptance was not used as evidence of need.",
+        "SNF criteria are met by E4 and E6. Acceptance is not evidence of what the member needs.",
+    ])
+    def test_pass_a_mention_that_sets_acceptance_aside(self, rationale):
+        v = self.go("snf", rationale)[1]
+        assert v.score is True and v.needs_review is True and "set aside" in v.comment
+
+    @pytest.mark.parametrize("rationale", [
+        "The facility is willing to take him, so SNF is appropriate.",
+        "SNF-A accepted, so SNF fits. Acceptance was not used as evidence.",  # one sentence still uses it
+        "Wound care needs SNF. Notes should go to the accepting facility.",  # not set aside
+    ])
+    def test_fail_when_some_sentence_mentions_acceptance_without_setting_it_aside(self, rationale):
+        v = self.go("snf", rationale)[1]
+        assert v.score is False and "acceptance" in v.comment
+
+    def test_no_review_flag_without_a_mention(self):
+        assert self.go("snf", "Daily wound care and IV antibiotics need skilled nursing.")[1].needs_review is False
+
     def test_unscored_without_an_authorisation(self):
         assert verdict(self.goal, run(goal=self.goal, hospital=refer("SNF-A"))).score is None
 
