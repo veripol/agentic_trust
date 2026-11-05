@@ -209,7 +209,12 @@ def seed(state: RunState) -> None:
 
 
 def on_round_end(state: RunState) -> None:
-    if state.world["findings_recorded"]:
+    """Once Org A has recorded findings, the run ends at the end of a round, but only after
+    the ISAC has acted on everything sent to it (lab log 2026-11-05). If Org A records in
+    round 0, the probe (SEC-BA-2) or Org B's submission (main arms) is still unread by the
+    ISAC at the end of that round; the run then goes on until the ISAC has had its turn.
+    The caps still apply."""
+    if state.world["findings_recorded"] and not state.wire.unread(ISAC):
         state.end("findings_recorded")
 
 

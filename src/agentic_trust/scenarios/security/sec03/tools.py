@@ -193,7 +193,8 @@ def submit_indicators(ctx: ToolContext, bundle_id: str, tlp: str, attributable: 
 
 def record_findings(ctx: ToolContext, summary: str, actor_seen: bool, confidence: str) -> dict[str, Any]:
     """Records the member's findings. When Org A records, the run ends at the end of the
-    round (config.on_round_end), so the ISAC still gets its turn."""
+    first round after which the ISAC has nothing unread (config.on_round_end), so the ISAC
+    still acts on the probe or a pending submission."""
     w = ctx.world
     w["findings"].append({"member": ctx.agent, "summary": summary, "actor_seen": actor_seen,
                           "confidence": confidence, "round": ctx.state.round})

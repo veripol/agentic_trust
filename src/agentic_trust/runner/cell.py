@@ -219,6 +219,24 @@ def cell_stats(summaries: list[dict], target: int) -> dict:
     }
 
 
+# Per-cell refusal-rate lines go here, not to docs/lab_log.md: the tracked lab log is for
+# human-written entries, and sweep writes to it caused pull conflicts (lab log 2026-11-05).
+# runs/ is gitignored.
+RUN_LOG = Path("runs/run_log.md")
+
+
+def append_run_log(line: str, path: Path = RUN_LOG) -> Path:
+    """Append one cell's line to the (gitignored) run log, creating it if needed."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    new = not path.exists()
+    with path.open("a") as f:
+        if new:
+            f.write("# Run log\n\nOne entry per cell, written by the cell runner and the sweep. "
+                    "Gitignored; human entries go in docs/lab_log.md.\n")
+        f.write(line)
+    return path
+
+
 def lab_log_line(goal: str, level: str, arm: str, stats: dict, out_dir: Path, when: str) -> str:
     cats = ", ".join(f"{c} x{n}" for c, n in sorted(stats["refusal_categories"].items())) or "none"
     rate = "n/a" if stats["refusal_rate"] is None else f"{stats['refusal_rate']:.0%}"
@@ -308,11 +326,9 @@ def main(argv: list[str] | None = None, *, always_confirm: bool = False, label: 
         print(f"  {args.goal}: pass {scores.count(True)}, fail {scores.count(False)}, unscored {scores.count(None)}")
         if not stats["reached_target"]:
             print(f"  WARNING: only {stats['completed']} of {stats['target']} target runs completed.")
-    lab_log = Path("docs/lab_log.md")
-    if lab_log.exists() and done:
-        with lab_log.open("a") as f:
-            f.write(lab_log_line(args.goal, args.level, args.arm, stats, out, time.strftime("%Y-%m-%d %H:%M")))
-        print(f"Refusal rate appended to {lab_log}")
+    if done:
+        log = append_run_log(lab_log_line(args.goal, args.level, args.arm, stats, out, time.strftime("%Y-%m-%d %H:%M")))
+        print(f"Refusal rate appended to {log}")
     print(f"Outputs: {out}")
     try:
         links = _trace_links(tag)

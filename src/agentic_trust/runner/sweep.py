@@ -47,7 +47,7 @@ from agentic_trust.runner.budget import PROJECT_BUDGET_USD, Ledger
 DEFAULT_USE_CASE = "sec01"
 ROOT = Path("runs/sweep/sec01")  # the default use case's paths; others: runs/sweep/<name>
 DIGEST = Path("docs/results/sec01.md")
-LAB_LOG = Path("docs/lab_log.md")
+RUN_LOG = cell.RUN_LOG  # gitignored; the sweep never writes docs/lab_log.md (lab log 2026-11-05)
 LEVELS = ("P0", "P1", "P2")
 
 
@@ -182,10 +182,9 @@ def run_sweep(
                                   log=lambda _: None, limit_usd=limit_usd, resume=True, on_run=on_run,
                                   reserve_per_run=reserve, uc=_uc(uc))
         stats = cell.cell_stats(summaries, target)
-        if lab_log is not None and lab_log.exists():
-            with lab_log.open("a") as f:
-                f.write(cell.lab_log_line(spec.goal or "shared-P0", spec.level, spec.arm, stats,
-                                          root / spec.name, time.strftime("%Y-%m-%d %H:%M")))
+        if lab_log is not None:
+            cell.append_run_log(cell.lab_log_line(spec.goal or "shared-P0", spec.level, spec.arm, stats,
+                                                  root / spec.name, time.strftime("%Y-%m-%d %H:%M")), lab_log)
         tracing.flush_quietly()
         if stats["budget_stop"]:
             log(f"Stopped at the ${limit_usd:.2f} spend limit during {spec.name}.")
@@ -294,7 +293,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         outcome = run_sweep(cells, args.repeats, root=args.root, ledger=ledger, model_factory=make_model,
-                            lab_log=LAB_LOG, limit_usd=limit, uc=uc)
+                            lab_log=RUN_LOG, limit_usd=limit, uc=uc)
     except KeyboardInterrupt:
         tracing.flush_quietly()
         print("\nStopped. Every finished run is saved; rerun the same command to resume where it left off.")

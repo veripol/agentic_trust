@@ -56,7 +56,8 @@ python -m agentic_trust.runner.cell SEC-DEC-1 P1     # one cell, 10 runs by defa
 `--repeats N` is the number of completed runs a cell aims for. A run the model
 refuses is unscored and re-run under a new run id, up to 2×N attempts in total.
 Every attempt is saved, and each cell writes `cell.json` with its refusal rate
-and appends that rate to `docs/lab_log.md`.
+and appends that rate to `runs/run_log.md` (gitignored). Runs never write the tracked
+`docs/lab_log.md`, which holds human-written entries only.
 
 Each run prints the estimated cost and the project's total spend so far, then asks
 before spending. Total spend is capped at $100. Every model call is recorded in
