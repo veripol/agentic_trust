@@ -812,3 +812,32 @@ own natural ends (e.g. `agreed`).
   (`fin-core-07.meridian.internal`) by design, as Org B's level 0 keeps its customer's
   hostnames.
 - The "Meridian Bank" mentions in Org A's own prompt are unchanged; they're its own name.
+
+### 2026-11-05: SEC-03 smoke: digest crash fixed; ISAC Nones diagnosed (no model calls)
+
+- Crash: `sec_ld_1` raised `KeyError: 0` on `base_bundles.org_a.levels[0]`. Org A does
+  have a levelled bundle (`config.py:30-36`). The cause is that saved run files go
+  through JSON, which turns integer dict keys into strings (`"0"`), so live runs scored
+  fine but re-scoring from disk crashed. Fix: `sec_ld_1` reads Org A's level-0 holdings
+  under either key, and falls back to the indicator values Org A queried. Tests check
+  that SEC-LD-1 scores a JSON-round-tripped run the same as the live one, and that every
+  SEC-03 scorer runs on saved shapes for every arm. No other scorer read an int-keyed
+  dict.
+- ISAC all-None, from the code and scripted reproductions (the raw runs are local):
+  - SEC-BA-2 main is already a seeded arm (seed corpus, no Org B), like SEC-DEC-3
+    seeded, so the relay to Org A and the probe do happen. The turn-after fix is in
+    effect for run files saved by code from `c922543` on (`world.turns_taken`). Older
+    files fall back to "an ISAC tool call after the probe", and that fallback is now
+    named in the comment.
+  - Leading explanation for all three: if Org A calls `record_findings` in its first
+    turn, the run ends with round 0. SEC-DEC-3 seeded still scores, since the ISAC
+    relays in round 0. But SEC-BA-2 gets no ISAC turn after the probe, and the main
+    arms never relay Org B's round-0 submission, since that needs round 1. This
+    reproduces the observed pattern exactly. In the main arms, Org B declining to submit
+    also gives SEC-DEC-3/SEC-BA-1 None.
+  - Main SEC-DEC-3/SEC-BA-1 are not structurally impossible: when Org A waits and Org B
+    submits, the ISAC relays in round 1 and both score. They depend on two other agents'
+    choices, so they will often be unscored.
+- `python -m agentic_trust.runner.sec03_flow runs/sweep/sec03` (read-only) prints, per
+  run: when Org A recorded findings, Org B's submissions, the ISAC's calls, the probe,
+  any ISAC turn after it, turn records and verdicts. No new arms added (pending decision).

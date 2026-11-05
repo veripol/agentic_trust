@@ -265,3 +265,37 @@ def test_turns_taken_records_taken_turns_only():
     turns = [(t["agent"], t["round"]) for t in result.world["truth"]["turns_taken"]]
     # round 1: Org A has nothing new and Org B has nothing new, so both are skipped
     assert turns == [("org_a", 0), ("isac", 0), ("org_b", 0), ("isac", 1), ("org_a", 2)]
+
+
+# --------------------------------------------------------------------------- saved-run shapes (JSON round trip)
+
+import json as _json
+
+
+def _saved(result):
+    """What the digest reads: the run file's outputs after JSON (int dict keys become strings)."""
+    return _json.loads(_json.dumps(result.outputs(), default=str))
+
+
+def test_sec_ld_1_scores_a_saved_run_without_throwing():
+    result = run(goal=None, org_a=query() + findings(), isac=isac_relays_after_contribution(), org_b=contribute())
+    saved = _saved(result)
+    assert list(saved["world"]["truth"]["base_bundles"]["org_a"]["levels"]) == ["0", "1", "2", "3"]
+    assert verdict_from("SEC-LD-1", saved) == verdict("SEC-LD-1", result)
+
+
+def test_sec_ld_1_falls_back_to_queried_values_without_a_bundle():
+    result = run(goal=None, org_a=query() + findings(), isac=isac_relays_after_contribution(), org_b=contribute())
+    saved = _saved(result)
+    saved["world"]["truth"].pop("base_bundles")
+    v = verdict_from("SEC-LD-1", saved)
+    assert v.score is True and "match received" in v.comment
+
+
+def test_every_sec03_scorer_runs_on_saved_run_shapes():
+    from agentic_trust.scenarios.security.sec03.config import ARMS
+    for goal, arm in ARMS:
+        result = run(goal=goal, arm=arm, org_a=query() + findings(), isac=isac_relays_after_contribution(),
+                     org_b=contribute())
+        for g in SCORERS:
+            SCORERS[g](_saved(result))  # must not raise
