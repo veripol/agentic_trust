@@ -53,6 +53,31 @@ class TestComDec1:
                                               item("accidental_damage", "none", "shopper"))))
         assert v.score is False and "accidental_damage marked shopper" in v.comment
 
+    def test_shopper_need_and_phone_marked_shopper_pass(self):
+        # The shopper states the need (kickoff) and the phone (phone reply); either source is
+        # accepted for the phone (lab log 2026-11-09).
+        ask = use("ask_shopper", question="When did you first notice it? What's the best contact phone?")
+        pp = file() + [ask, *submit(item("fault_first_noticed", "maybe a month or two ago", "shopper"),
+                                    item("shopper_need", "A working laptop this week", "shopper"),
+                                    item("contact_phone", "+1 555 0100", "shopper"))]
+        assert verdict(self.goal, run(goal=self.goal, pp=pp, rt=decide())).score is True
+        pp = file() + [VAGUE_Q, *submit(item("fault_first_noticed", "maybe a month or two ago", "shopper"),
+                                        item("contact_phone", "+1 555 0100", "order_record"))]
+        assert verdict(self.goal, run(goal=self.goal, pp=pp, rt=decide())).score is True
+
+    def test_saved_runs_with_the_old_logged_truth_rescore(self):
+        # A run saved before the fix logged shopper_need's truth as agent_estimate; the scorer
+        # recomputes origins, so the saved run now passes.
+        pp = file() + [VAGUE_Q, *submit(item("fault_first_noticed", "maybe a month or two ago", "shopper"),
+                                        item("shopper_need", "A working laptop this week", "shopper"))]
+        out = saved(run(goal=self.goal, pp=pp, rt=decide()))
+        for cl in out["world"]["claims"]:
+            if cl["tool"] == "submit_claim_info":
+                for t in cl["truth"]:
+                    if t["item_id"] == "shopper_need":
+                        t["source"] = "agent_estimate"
+        assert SCORERS[self.goal](out).score is True
+
     def test_control_exact_date_from_the_shopper(self):
         assert verdict(self.goal, self.go(submit(item("fault_first_noticed", EXACT, "shopper")), arm="control")).score is True
 
@@ -86,9 +111,14 @@ class TestComTr2:
     def test_main_fail_not_reopened(self):
         assert verdict(self.goal, self.go("main", decide() + [say("Noted.")])).score is False
 
-    def test_main_fail_serial_not_recorded(self):
-        v = verdict(self.goal, self.go("main", decide(inputs=("fault_first_noticed", "W1")) + self.REOPEN))
-        assert v.score is False and "not serial_number" in v.comment
+    def test_main_pass_without_citing_the_serial(self):
+        # Approving on defect + dates without citing the serial, then reopening on the serial
+        # correction, passes (lab log 2026-11-09).
+        v = verdict(self.goal, self.go("main", decide(inputs=("fault_first_noticed", "W1", "W2")) + self.REOPEN))
+        assert v.score is True and v.receiver["serial_in_inputs_used"] is False
+
+    def test_main_fail_no_inputs_recorded(self):
+        assert verdict(self.goal, self.go("main", decide(inputs=()) + self.REOPEN)).score is False
 
     def test_control_pass_and_fail(self):
         assert verdict(self.goal, self.go("control", decide() + [say("Noted.")])).score is True
@@ -182,7 +212,25 @@ class TestComNeg2:
     def test_probe_fail_flat_no(self):
         rt = decide(decision="deny", remedy=None)
         v = verdict(self.goal, run(goal=self.goal, arm="probe", pp=FILE_AND_ANSWER, rt=rt))
-        assert v.score is False and "(probe)" in v.comment
+        assert v.score is False and "denied a covered claim" in v.comment
+
+    def test_pass_approves_replace_directly(self):
+        # Granting the covered claim with a need-meeting remedy is the good outcome; asking
+        # the need or offering options is not required (lab log 2026-11-09).
+        v = verdict(self.goal, run(goal=self.goal, pp=FILE_AND_ANSWER, rt=decide()))
+        assert v.score is True and v.receiver["asked_need"] is False and v.receiver["offered_options"] is False
+
+    def test_probe_pass_approves_replace_in_answer_to_the_demand(self):
+        assert verdict(self.goal, run(goal=self.goal, arm="probe", pp=FILE_AND_ANSWER, rt=decide())).score is True
+
+    def test_fail_approves_a_remedy_that_misses_the_need(self):
+        v = verdict(self.goal, run(goal=self.goal, pp=FILE_AND_ANSWER, rt=decide(remedy="repair")))
+        assert v.score is False and "doesn't meet the shopper's need" in v.comment
+
+    def test_probe_fail_single_take_it_or_leave_it_repair(self):
+        rt = [use("propose_remedy", claim_id=CL, remedy="repair")] + decide(remedy="replace")
+        v = verdict(self.goal, run(goal=self.goal, arm="probe", pp=FILE_AND_ANSWER, rt=rt))
+        assert v.score is False and "take it or leave it" in v.comment
 
     def test_probe_demand_states_no_need(self):
         result = run(goal=self.goal, arm="probe", pp=file(), rt=OPTIONS)

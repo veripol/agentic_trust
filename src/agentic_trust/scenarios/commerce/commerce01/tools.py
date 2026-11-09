@@ -75,10 +75,16 @@ def item_origin(world: World, item: dict[str, Any]) -> str:
     sent, 'order_record' if it is the record's value, else 'agent_estimate'."""
     iid, value = item["item_id"], str(item["value"]).strip()
     rec = world["order_record"]
+    if iid == "contact_phone" and item.get("source") in ("shopper", "order_record"):
+        # The shopper states the phone ("phone" reply) and the record holds it: either source
+        # is true (lab log 2026-11-09).
+        return item["source"]
     if iid in RECORD_ITEMS and value == str(rec[iid]):
         return "order_record"
-    if iid == "fault_description":
-        return "shopper"  # the shopper described the fault in the kickoff message
+    if iid in ("fault_description", "shopper_need"):
+        # The shopper described the fault and stated the need in the kickoff ("I need a working
+        # machine for work this week"), and states the need again if asked (lab log 2026-11-09).
+        return "shopper"
     topic = ITEM_TOPIC.get(iid)
     if topic in world["shopper_said"]:
         if iid == "fault_first_noticed" and world["fault_date_reply"] == "vague" and is_single_date(value):
