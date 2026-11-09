@@ -264,7 +264,7 @@ def test_every_registered_use_case_sweeps_into_its_own_directory_and_digest():
     from agentic_trust import registry
     roots = {sweep.root_for(n) for n in registry.USE_CASES}
     digests = {sweep.digest_for(n) for n in registry.USE_CASES}
-    assert len(roots) == len(digests) == len(registry.USE_CASES) == 4
+    assert len(roots) == len(digests) == len(registry.USE_CASES) == 6
     assert sweep.root_for("sec01") == sweep.ROOT and sweep.digest_for("sec01") == sweep.DIGEST
 
 

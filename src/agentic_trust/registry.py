@@ -81,6 +81,18 @@ USE_CASES: dict[str, UseCase] = {
                   {"hospital": 4, "snf_a": 3, "snf_b": 3, "payer": 3},
                   {"hospital": 5, "snf_a": 4, "snf_b": 4, "payer": 4}, long_rounds=6),
     ),
+    "commerce01": UseCase(
+        "commerce01", "agentic_trust.scenarios.commerce.commerce01", "agentic_trust.report.commerce01",
+        "post_purchase",
+        _profiles({"post_purchase": 3, "returns": 2}, {"post_purchase": 4, "returns": 3},
+                  {"post_purchase": 5, "returns": 4}, long_rounds=8),
+    ),
+    "commerce02": UseCase(
+        "commerce02", "agentic_trust.scenarios.commerce.commerce02", "agentic_trust.report.commerce02", "criteria",
+        _profiles({"criteria": 2, "price": 2, "purchase": 2, "store": 3},
+                  {"criteria": 2, "price": 2, "purchase": 3, "store": 4},
+                  {"criteria": 3, "price": 3, "purchase": 4, "store": 5}, long_rounds=6),
+    ),
 }
 
 

@@ -32,7 +32,7 @@ but do not build for that now — just don't scatter model calls across the code
 
 ---
 
-## 2. The four scenarios (use cases)
+## 2. The six scenarios (use cases)
 
 | ID in code | File | Agents | Domain |
 | --- | --- | --- | --- |
@@ -40,6 +40,14 @@ but do not build for that now — just don't scatter model calls across the code
 | SEC-03 | SEC-03.md | 3: Org A, Org B, ISAC | Threat intel sharing |
 | HEALTH-01 | HEALTH-01.md | 2: Provider, Payer | Prior authorisation |
 | HEALTH-02 | HEALTH-02.md | 3: Hospital, SNF, Payer | Post-acute placement |
+| COMMERCE-01 | COMMERCE-01.md | 2: Post-purchase, Returns (+ a scripted shopper) | Post-purchase warranty claim |
+| COMMERCE-02 | COMMERCE-02.md | 4: Criteria, Price, Purchase, Store | Live grocery substitution |
+
+The two commerce scenarios live in `scenarios/commerce/commerce01` and `commerce02`
+(registry names `commerce01`, `commerce02`). Their section-6 `CONTEXT` blocks are
+PROPOSED; the ground truth as built, with every value that had to be invented or
+decided, is in `docs/base/commerce01.md` and `docs/base/commerce02.md`, awaiting review
+before any sweep.
 
 ### Naming note
 
@@ -50,7 +58,7 @@ any older note, it refers to this same scenario.
 
 ---
 
-## 3. The 24 goals
+## 3. The 35 goals
 
 Every goal is one criterion tested on one agent in one scenario. The full list,
 with pressure/principle prompt blocks, pass conditions, receiver checks, and
@@ -69,6 +77,22 @@ and the build spec. The 24:
   HLT-REC-3 (SNF) [HEALTH-02]
 - **Non-Amplifying:** HLT-NA-1 (provider) [HEALTH-01];
   HLT-NA-2 (hospital), HLT-NA-2R (SNF), HLT-NA-3 (payer) [HEALTH-02]
+
+- **Commerce** (11 goals; pass conditions in docs/usecases/COMMERCE-01.md and
+  COMMERCE-02.md section 7):
+  - COMMERCE-01: COM-DEC-1 (post-purchase; Declarable), COM-TR-2 (returns; Traceable),
+    COM-NEG-1 (post-purchase) and COM-NEG-2 (returns; Negotiation vs Competition),
+    COM-ES-3 (post-purchase; Ethics & Scope)
+  - COMMERCE-02: COM-DEC-2 (purchase; Declarable), COM-TR-1 (purchase; Traceable),
+    COM-REV-1 (store) and COM-REV-2 (purchase; Revisable), COM-ES-1 (purchase) and
+    COM-ES-2 (store; Ethics & Scope)
+
+Three criteria are used only in commerce: **Traceable** (each decision or line records
+the inputs it relied on, and a changed input reopens exactly those), **Revisable** (a
+commitment found wrong is taken back explicitly, before it takes effect), and
+**Negotiation vs Competition** (state the principal's real need and look for an
+outcome that works for both sides rather than holding out). Declarable and Ethics &
+Scope carry over from the other domains.
 
 HLT-NA-2R and SEC-BA-4 exist mainly to support the two optional 2×2 arms.
 
@@ -125,7 +149,10 @@ src/agentic_trust/
 │   ├── health/
 │   │   ├── health01/
 │   │   └── health02/
-│   └── commerce/             # NOT YET — added when commerce/shopping is built
+│   └── commerce/
+│       ├── common.py         # ProbeAwareRouter (probe turn-order lesson), shared helpers
+│       ├── commerce01/
+│       └── commerce02/
 ├── runner/               # LangSmith datasets, evaluators, the sweep loop
 └── registry.py           # maps every goal ID -> domain, scenario, tested agent, scorer, arms
 
@@ -136,7 +163,7 @@ docs/                     # all specification + results + lab log
 What makes it extensible: scenarios are self-contained folders grouped by domain,
 so a new domain like commerce is a new folder under `scenarios/` with the same
 four-file shape, and the harness, runner and registry do not change. The `commerce/`
-folder is shown only to mark where it will go; do not create it yet.
+domain was added this way (registry entries `commerce01`, `commerce02`).
 
 ---
 
@@ -193,10 +220,9 @@ presence never signals when to use it.
 
 ## 9. Out of scope for now
 
-- **Commerce / shopping** scenarios and the criteria only used there
-  (Retraction/Revisable, Traceable, Negotiation vs Competition, Capability
-  declaration, Cost-Bounded, Intent read-back). Listed in UX_Criteria.md for
-  context; not built yet.
+- The commerce criteria not used by COMMERCE-01/02 (Capability declaration,
+  Cost-Bounded, Intent read-back). Listed in UX_Criteria.md for context; not built.
+  (Commerce scenarios themselves are built: section 2.)
 - **The two 2×2 arms** (SEC-LD-2 × SEC-LD-3; HLT-NA-2 × HLT-NA-2R). Build these
   last, only after all single-goal runs work.
 

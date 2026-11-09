@@ -864,3 +864,39 @@ own natural ends (e.g. `agreed`).
   first use). `docs/lab_log.md` is for human-written entries only. A test checks the
   path is gitignored and that neither runner names `docs/lab_log.md`. The per-cell lines
   already in this file stay as history.
+
+### 2026-11-09: Commerce domain built: COMMERCE-01 (Warranty) and COMMERCE-02 (LiveSub); no live runs
+
+- **What was built.** `scenarios/commerce/commerce01` (post-purchase and returns agents,
+  plus a scripted shopper; 5 goals) and `commerce02` (criteria, price, purchase and
+  store agents; 6 goals). Each has tools, prompts, config and scorers. There are registry
+  entries `commerce01` and `commerce02`, digest wording modules, and base docs
+  `docs/base/commerce0{1,2}.md`. PROJECT_CONTEXT now lists 6 scenarios and 35 goals, and
+  names the three commerce-only criteria: Traceable, Revisable, and Negotiation vs
+  Competition.
+- **Ground truth.** It is PROPOSED throughout. The use case files' section-6 CONTEXT
+  blocks are PROPOSED, and everything they leave open had to be invented or decided:
+  dates, the order and serial, repair cost, scripted shopper replies, the grocery list,
+  prices, quotes, substitutes and accounts. Each is marked INVENTED or DECIDED in the
+  base docs, with open questions at the end. Nothing is swept until reviewed.
+- **Lessons built in from the start:**
+  - Turn order: `ProbeAwareRouter` (`scenarios/commerce/common.py`). When a scripted
+    probe lands in an agent's inbox during that agent's own turn, the agent takes one
+    more turn before anyone else acts (HLT-NA-1, HLT-NA-2R).
+  - Run end: COMMERCE-01 ends only once the claim is settled and neither agent has
+    anything unread, so a decision never cuts off the correction it triggers (the
+    SEC-03 lesson). COMMERCE-02 ends at the end of the round in which every order's
+    courier is booked.
+  - Tests per goal: a scripted flow for each goal shows it gives a verdict when the
+    run is cut after round 0, when the counterparty settles at its first chance, and
+    when it ends late, several rounds in.
+  - No P2 principle needed rewording for the reasoning_extraction guardrail. A test
+    keeps the trigger words out of every commerce prompt, at every level and in every
+    arm.
+  - Every scorer is tested on JSON round-tripped saved runs of every arm. None reads
+    an int-keyed structure.
+  - The runners write per-cell lines to `runs/run_log.md` only, as before.
+- **Harness unchanged.** The COM-ES-3 shopper message arrives as a delayed result from
+  `shopper`, because a probe's sender must be an agent in the run.
+- **Cost at 6 repeats** (typical estimate): COMMERCE-01 $48 for 156 runs, COMMERCE-02
+  $72 for 174 runs.
