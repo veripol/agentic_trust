@@ -922,3 +922,12 @@ no new model calls.
   request once decidable) and no single take-it-or-leave-it `repair`. Asking the need or
   offering options is recorded in the receiver, but not required. The probe arm is
   judged the same way, from the answer to the refund demand on.
+
+### 2026-11-09: COM-DEC-2 accepts tool names for set_by / quoted_by
+
+- `set_by: set_criteria` and `quoted_by: check_prices` now count the same as `criteria`
+  and `price`, because the line names the right source by the tool used. So do
+  `criteria_agent`/`price_agent` and the spaced forms. `set_by: shopper` still fails:
+  the criteria agent sets requirements, so naming the shopper is a real mislabel. The
+  `criterion_source` check is unchanged. The scorer reads the saved `place_order` args,
+  so saved runs re-score.

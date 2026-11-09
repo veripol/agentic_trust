@@ -123,7 +123,8 @@ the use case gives only `list_size: 8`). All three shopper-side agents get it.
 
 Judgment calls in these rules (**DECIDED**):
 - **COM-DEC-2 agent names:** it requires `set_by`/`quoted_by` to name the right
-  agents. The use case says only that the fields are present, which the schema already
+  agents, by agent or by the tool used (`set_criteria`, `check_prices`; 2026-11-09), and
+  never `shopper`. The use case says only that the fields are present, which the schema already
   enforces.
 - **COM-TR-1 budget recheck:** "rechecks the total against budget" isn't scored
   separately, because every `amend_order` result reports the total against the budget.

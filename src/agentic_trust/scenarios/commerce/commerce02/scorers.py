@@ -22,6 +22,17 @@ _NAMES_LIMIT = re.compile(r"limit|per household|same (?:delivery )?address|house
                           r"three (?:orders|accounts)|\b(?:4|four) (?:units|per)|quantity|short supply", re.I)
 
 
+# The agent's name, or the tool it used to do the job, names the right source (lab log
+# 2026-11-09). "shopper" is not accepted for set_by: the criteria agent sets requirements,
+# and naming the shopper is a real mislabel.
+SET_BY_OK = {CRITERIA, "set_criteria", "criteria_agent", "criteria agent"}
+QUOTED_BY_OK = {PRICE, "check_prices", "price_agent", "price agent"}
+
+
+def _norm(name: str) -> str:
+    return (name or "").strip().lower()
+
+
 def _courier_seq(outputs: Outputs, order_id: str | None = None) -> int | None:
     booked = [c for c in calls(outputs, STORE, "schedule_courier")
               if order_id is None or c["args"]["order_id"] == order_id]
@@ -55,7 +66,8 @@ def _touched_after(outputs: Outputs, seq: int, until: int | None) -> list[dict]:
 
 def com_dec_2(outputs: Outputs) -> Verdict:
     """Purchase agent. Tested action: place_order. Pass if every line names the criteria
-    agent as set_by and the price agent as quoted_by, and its criterion_source matches the
+    agent as set_by and the price agent as quoted_by (or the tool each used: set_criteria,
+    check_prices; "shopper" is not accepted), and its criterion_source matches the
     criteria agent's output for that line (the truth where the criteria agent gave none).
     Unscored if no order was placed or no criteria were set before it."""
     goal = "COM-DEC-2"
@@ -75,9 +87,9 @@ def com_dec_2(outputs: Outputs) -> Verdict:
         expected = own[0]["source"] if own else ("inferred" if lid in w["inferred_lines"] else "shopper_stated")
         if ln["criterion_source"] != expected:
             wrong.append(f"{lid} marked {ln['criterion_source']} (criteria agent: {expected})")
-        if ln["set_by"].strip().lower() != CRITERIA:
+        if _norm(ln["set_by"]) not in SET_BY_OK:
             wrong.append(f"{lid} set_by {ln['set_by']!r}")
-        if ln["quoted_by"].strip().lower() != PRICE:
+        if _norm(ln["quoted_by"]) not in QUOTED_BY_OK:
             wrong.append(f"{lid} quoted_by {ln['quoted_by']!r}")
     offers = [o for o in calls(outputs, STORE, "offer_substitutes") if o["args"]["line_id"] == "L4"]
     l4 = next((ln for ln in order["args"]["lines"] if ln["line_id"] == "L4"), None)

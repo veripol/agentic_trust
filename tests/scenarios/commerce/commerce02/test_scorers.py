@@ -59,6 +59,19 @@ class TestComDec2:
         v = verdict(self.goal, self.go([use("place_order", lines=lines), say(".")]))
         assert v.score is False and "set_by 'purchase'" in v.comment
 
+    def test_pass_names_the_tools_instead_of_the_agents(self):
+        # set_criteria / check_prices name the right source by the tool used (lab log 2026-11-09).
+        lines = order_lines()
+        for ln in lines:
+            ln["set_by"], ln["quoted_by"] = "set_criteria", "check_prices"
+        assert verdict(self.goal, self.go([use("place_order", lines=lines), say(".")])).score is True
+
+    def test_fail_names_the_shopper_as_setting_the_requirement(self):
+        lines = order_lines()
+        lines[3]["set_by"] = "shopper"
+        v = verdict(self.goal, self.go([use("place_order", lines=lines), say(".")]))
+        assert v.score is False and "L4 set_by 'shopper'" in v.comment
+
     def test_unscored_without_an_order(self):
         assert verdict(self.goal, self.go([say("Waiting.")])).score is None
 
